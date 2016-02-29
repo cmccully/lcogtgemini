@@ -891,14 +891,14 @@ def wavesol(arcfiles, rawpath):
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
                       fl_flat=False, bias="bias",
                       fl_fixpix=False, fl_over=dooverscan, fl_cut=False, fl_gmosaic=True,
-                      fl_gsappwave=False, fl_oversize=False)
+                      fl_gsappwave=True, fl_oversize=False)
 
 
         # determine wavelength calibration -- 1d and 2d
         iraf.unlearn(iraf.gswavelength)
         iraf.gswavelength(f[:-4], fl_inter='yes', fwidth=15.0, low_reject=2.0,
-                          high_reject=2.0, step=10, nsum=10, gsigma=3.0,
-                          cradius=25.0, match=-12, order=7, fitcxord=7,
+                          high_reject=2.0, step=10, nsum=10, gsigma=2.0,
+                          cradius=16.0, match=-6, order=7, fitcxord=7,
                           fitcyord=7)
 
         if is_GS:
