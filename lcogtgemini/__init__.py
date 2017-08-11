@@ -1147,8 +1147,8 @@ def rescale1e15(filename):
     hdu.flush()
     hdu.close()
     
-    
-if __name__ == "__main__":
+
+def run():
     # copy over sensr.fits, sensb.fits files
     # before running this script
     
@@ -1257,3 +1257,7 @@ if __name__ == "__main__":
     
     # Change out of the reduction directory
     iraf.chdir('..')
+
+
+if __name__ == "__main__":
+    run()
