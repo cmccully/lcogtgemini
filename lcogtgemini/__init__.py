@@ -4,7 +4,7 @@ Created on Nov 7, 2014
 
 @author: cmccully
 '''
-import os, shutil
+import os
 from glob import glob
 import pyfits
 import numpy as np
@@ -661,34 +661,34 @@ def fitxcor(warr, farr, telwarr, telfarr):
 
 def sort():
     if not os.path.exists('raw'):
-        os.mkdir('raw')
+        iraf.mkdir('raw')
     fs = glob('*.fits')
     for f in fs:
-        shutil.move(f, 'raw/')
+        iraf.mv(f, 'raw/')
     
     sensfs = glob('raw/sens*.fits')
     if len(sensfs) != 0:
         for f in sensfs:
-            shutil.move(f, './')
+            iraf.mv(f, './')
     # Make a reduction directory
     if not os.path.exists('work'):
-        os.mkdir('work')
+        iraf.mkdir('work')
 
     sensfs = glob('sens*.fits')
     if len(sensfs) != 0:
         for f in sensfs:
-            shutil.copy(f, 'work/')
+            iraf.cp(f, 'work/')
     
     if os.path.exists('telcor.dat'):
-        shutil.copy('telcor.dat', 'work/')
+        iraf.cp('telcor.dat', 'work/')
     
     if os.path.exists('raw/bias.fits'):
-        shutil.copy('raw/bias.fits', 'work/')
+        iraf.cp('raw/bias.fits', 'work/')
 
     fs = glob('raw/*.qe.fits')
     if len(fs) > 0:
         for f in fs:
-            shutil.copy(f, 'work/')
+            iraf.cp(f, 'work/')
     
     # make a list of the raw files
     fs = glob('raw/*.fits')
@@ -709,7 +709,7 @@ def init_northsouth(fs, topdir, rawpath):
         global dooverscan
         dooverscan = True
         if not os.path.exists(topdir + '/raw_fixhdr'):
-            os.mkdir(topdir + '/raw_fixhdr')
+            iraf.mkdir(topdir + '/raw_fixhdr')
         rawpath = '%s/raw_fixhdr/' % topdir
         os.system('gmoss_fix_headers.py --files="%s/raw/*.fits" --destination=%s' % (topdir, rawpath))
         base_stddir = 'ctionewcal/'
@@ -734,7 +734,7 @@ def getobstypes(fs):
 def makebias(fs, obstypes, rawpath):
     for f in fs:
         if f[-10:] == '_bias.fits':
-            shutil.copy(f, 'bias.fits')
+            iraf.cp(f, 'bias.fits')
 
     if not os.path.exists('bias.fits'):
         # Make the master bias
@@ -903,7 +903,7 @@ def wavesol(arcfiles, rawpath):
 
         if is_GS:
             # Make an extra random copy so that gqecorr works. Stupid Gemini.
-            shutil.copy(f[:-4]+'.fits', f[:-4]+'.arc.fits')
+            iraf.cp(f[:-4]+'.fits', f[:-4]+'.arc.fits')
         # transform the CuAr spectrum, for checking that the transformation is OK
         # output spectrum has prefix t
         iraf.unlearn(iraf.gstransform)
