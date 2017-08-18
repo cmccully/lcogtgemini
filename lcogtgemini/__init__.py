@@ -757,25 +757,6 @@ def getobjname(fs, obstypes):
     objname = objname.replace('ltt', 'l')
     return objname
 
-'''
-def getobjstdname(fs, obstypes,obsclasses):
-    objname = pyfits.getval(fs[(obstypes == 'OBJECT') & (obsclasses == 'science')][0], 'OBJECT', ext=0).lower()
-    stdname = pyfits.getval(fs[(obstypes == 'OBJECT') & ( (obsclasses == 'partnerCal') | (obsclasses == 'progCal') )][0], 'OBJECT', ext=0).lower()
-    
-    # get rid of nonsense in the name (like the plus, whitespace, and d, but not D)
-    objname = objname.replace('+', '')
-    objname = ''.join(objname.split())
-    stdname = stdname.replace('+', '')
-    #stdname = stdname.replace('d', '')
-    stdname = ''.join(stdname.split())
-    #stdname = stdname.lower()
-
-    # replace ltt with just l
-    objname = objname.replace('ltt', 'l')
-    stdname = stdname.replace('ltt', 'l')
-    return objname, stdname
-'''
-
 
 def maketxtfiles(fs, obstypes, obsclasses, objname):
     # go through each of the files (Ignore bias and aquisition files)
@@ -1003,7 +984,6 @@ def crreject(scifiles):
         nd = dsort.shape[0]
         # Calculate the difference between the 16th and 84th percentiles to be 
         # robust against outliers
-        # dsig = (dsort[0.84 * nd] - dsort[0.16 * nd]) / 2.0
         dsig = (dsort[int(round(0.84 * nd))] - dsort[int(round(0.16 * nd))]) / 2.0
         pssl = (dsig * dsig - readnoise * readnoise)
 
@@ -1115,28 +1095,6 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
                      float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
-'''
-def makesensfunc(scifiles, stdname, base_stddir, extfile):
-    #TODO use individual standard star observations in each setting, not just red and blue
-    for f in scifiles:
-        redorblue = getredorblue(f)
-        # If this is a standard star, run standard
-        # Standards will have an observation class of either progCal or partnerCal
-        # Standards will have an observation class of either progCal or partnerCal
-        obsclass = pyfits.getval(f[:-4] + '.fits', 'OBSCLASS')
-        if obsclass == 'progCal' or obsclass == 'partnerCal':
-            # Figure out which directory the stardard star is in
-            stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
-            
-            # iraf.gsstandard('est' + f[:-4], 'std' + redorblue,
-            #                'sens' + redorblue, starname=objname.lower(),
-            #                caldir='gmisc$lib/onedstds/'+stddir, fl_inter=True)
-
-            specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     stddir + stdname + '.dat' , extfile,
-                     float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
-                     float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
-'''
 
 def calibrate(scifiles, extfile, observatory):
     for f in scifiles:
@@ -1220,7 +1178,6 @@ def run():
     
     # get the object name
     objname = getobjname(fs, obstypes)
-    #objname, stdname = getobjstdname(fs, obstypes, obsclasses)
     
     # Make the text files for the IRAF tasks
     maketxtfiles(fs, obstypes, obsclasses, objname)
@@ -1257,7 +1214,6 @@ def run():
 
     # If standard star, make the sensitivity function
     makesensfunc(scifiles, objname, base_stddir, extfile)
-    # makesensfunc(scifiles, stdname, base_stddir, extfile)
     
     # Flux calibrate the spectrum
     calibrate(scifiles, extfile, observatory)
