@@ -1,7 +1,7 @@
 FROM docker.lco.global/miniconda2:4.2.12
 MAINTAINER Curtis McCully <cmccully@lco.global>
 
-RUN yum -y install epel-release gcc glibc.i686\
+RUN yum -y install epel-release gcc glibc.i686 xorg-x11-apps\
         && yum -y clean all
 
 RUN conda install -y pip numpy astropy ipython matplotlib scipy statsmodels \
@@ -26,8 +26,6 @@ WORKDIR /lco/gemini
 
 COPY . /lco/gemini
 RUN python /lco/gemini/setup.py install
-
-RUN yum -y install  xyeyes
 
 USER gemini
 
