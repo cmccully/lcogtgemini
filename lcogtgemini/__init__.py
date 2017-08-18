@@ -249,7 +249,7 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
     std_flux = magtoflux(std_wave, std_mag, stdzp)
 
     # Get the typical bandpass of the standard star,
-    std_bandpass = np.diff(std_wave).mean()
+    std_bandpass = np.max([50.0, np.diff(std_wave).mean()])
     # Smooth the observed spectrum to that bandpass
     obs_flux = boxcar_smooth(obs_wave, obs_flux, std_bandpass)
     # read in the extinction file (leave in magnitudes)
@@ -745,7 +745,7 @@ def makebias(fs, obstypes, rawpath):
         biastxtfile.close()
         iraf.gbias('@%s/bias.txt' % os.getcwd(), 'bias', rawpath=rawpath, fl_over=dooverscan)
 
-
+'''
 def getobjname(fs, obstypes):
     objname = pyfits.getval(fs[obstypes == 'OBJECT'][0], 'OBJECT', ext=0).lower()
     
@@ -756,6 +756,24 @@ def getobjname(fs, obstypes):
     # replace ltt with just l
     objname = objname.replace('ltt', 'l')
     return objname
+'''
+
+def getobjstdname(fs, obstypes,obsclasses):
+    objname = pyfits.getval(fs[(obstypes == 'OBJECT') & (obsclasses == 'science')][0], 'OBJECT', ext=0).lower()
+    stdname = pyfits.getval(fs[(obstypes == 'OBJECT') & ( (obsclasses == 'partnerCal') | (obsclasses == 'progCal') )][0], 'OBJECT', ext=0).lower()
+    
+    # get rid of nonsense in the name (like the plus, whitespace, and d, but not D)
+    objname = objname.replace('+', '')
+    objname = ''.join(objname.split())
+    stdname = stdname.replace('+', '')
+    #stdname = stdname.replace('d', '')
+    stdname = ''.join(stdname.split())
+    #stdname = stdname.lower()
+
+    # replace ltt with just l
+    objname = objname.replace('ltt', 'l')
+    stdname = stdname.replace('ltt', 'l')
+    return objname, stdname
 
 
 def maketxtfiles(fs, obstypes, obsclasses, objname):
@@ -984,7 +1002,8 @@ def crreject(scifiles):
         nd = dsort.shape[0]
         # Calculate the difference between the 16th and 84th percentiles to be 
         # robust against outliers
-        dsig = (dsort[0.84 * nd] - dsort[0.16 * nd]) / 2.0
+        # dsig = (dsort[0.84 * nd] - dsort[0.16 * nd]) / 2.0
+        dsig = (dsort[int(round(0.84 * nd))] - dsort[int(round(0.16 * nd))]) / 2.0
         pssl = (dsig * dsig - readnoise * readnoise)
 
         mask = d == 0.0
@@ -1073,6 +1092,7 @@ def rescale_chips(scifiles):
         hdu.flush()
         hdu.close()
 
+'''
 def makesensfunc(scifiles, objname, base_stddir, extfile):
     #TODO use individual standard star observations in each setting, not just red and blue
     for f in scifiles:
@@ -1093,6 +1113,29 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
                      stddir + objname + '.dat' , extfile,
                      float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
+'''
+
+def makesensfunc(scifiles, stdname, base_stddir, extfile):
+    #TODO use individual standard star observations in each setting, not just red and blue
+    for f in scifiles:
+        redorblue = getredorblue(f)
+        # If this is a standard star, run standard
+        # Standards will have an observation class of either progCal or partnerCal
+        # Standards will have an observation class of either progCal or partnerCal
+        obsclass = pyfits.getval(f[:-4] + '.fits', 'OBSCLASS')
+        if obsclass == 'progCal' or obsclass == 'partnerCal':
+            # Figure out which directory the stardard star is in
+            stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
+            
+            # iraf.gsstandard('est' + f[:-4], 'std' + redorblue,
+            #                'sens' + redorblue, starname=objname.lower(),
+            #                caldir='gmisc$lib/onedstds/'+stddir, fl_inter=True)
+
+            specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
+                     stddir + stdname + '.dat' , extfile,
+                     float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
+                     float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
+
 
 def calibrate(scifiles, extfile, observatory):
     for f in scifiles:
@@ -1163,7 +1206,7 @@ def run():
     fs = sort()
     
     # Change into the reduction directory
-    iraf.chdir('work')
+    iraf.cd('work')
 
     # Initialize variables that depend on which site was used
     extfile, observatory, base_stddir, rawpath = init_northsouth(fs, topdir, rawpath)
@@ -1175,7 +1218,8 @@ def run():
     makebias(fs, obstypes, rawpath)
     
     # get the object name
-    objname = getobjname(fs, obstypes)
+    # objname = getobjname(fs, obstypes)
+    objname, stdname = getobjstdname(fs, obstypes, obsclasses)
     
     # Make the text files for the IRAF tasks
     maketxtfiles(fs, obstypes, obsclasses, objname)
@@ -1211,7 +1255,8 @@ def run():
     #rescale_chips(scifiles)
 
     # If standard star, make the sensitivity function
-    makesensfunc(scifiles, objname, base_stddir, extfile)
+    # makesensfunc(scifiles, objname, base_stddir, extfile)
+    makesensfunc(scifiles, stdname, base_stddir, extfile)
     
     # Flux calibrate the spectrum
     calibrate(scifiles, extfile, observatory)
@@ -1256,7 +1301,7 @@ def run():
     rescale1e15(objname + '.fits')
     
     # Change out of the reduction directory
-    iraf.chdir('..')
+    iraf.cd('..')
 
 
 if __name__ == "__main__":
