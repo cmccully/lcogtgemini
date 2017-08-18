@@ -745,7 +745,7 @@ def makebias(fs, obstypes, rawpath):
         biastxtfile.close()
         iraf.gbias('@%s/bias.txt' % os.getcwd(), 'bias', rawpath=rawpath, fl_over=dooverscan)
 
-'''
+
 def getobjname(fs, obstypes):
     objname = pyfits.getval(fs[obstypes == 'OBJECT'][0], 'OBJECT', ext=0).lower()
     
@@ -756,8 +756,8 @@ def getobjname(fs, obstypes):
     # replace ltt with just l
     objname = objname.replace('ltt', 'l')
     return objname
-'''
 
+'''
 def getobjstdname(fs, obstypes,obsclasses):
     objname = pyfits.getval(fs[(obstypes == 'OBJECT') & (obsclasses == 'science')][0], 'OBJECT', ext=0).lower()
     stdname = pyfits.getval(fs[(obstypes == 'OBJECT') & ( (obsclasses == 'partnerCal') | (obsclasses == 'progCal') )][0], 'OBJECT', ext=0).lower()
@@ -774,6 +774,7 @@ def getobjstdname(fs, obstypes,obsclasses):
     objname = objname.replace('ltt', 'l')
     stdname = stdname.replace('ltt', 'l')
     return objname, stdname
+'''
 
 
 def maketxtfiles(fs, obstypes, obsclasses, objname):
@@ -1092,7 +1093,7 @@ def rescale_chips(scifiles):
         hdu.flush()
         hdu.close()
 
-'''
+
 def makesensfunc(scifiles, objname, base_stddir, extfile):
     #TODO use individual standard star observations in each setting, not just red and blue
     for f in scifiles:
@@ -1113,8 +1114,8 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
                      stddir + objname + '.dat' , extfile,
                      float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
-'''
 
+'''
 def makesensfunc(scifiles, stdname, base_stddir, extfile):
     #TODO use individual standard star observations in each setting, not just red and blue
     for f in scifiles:
@@ -1135,7 +1136,7 @@ def makesensfunc(scifiles, stdname, base_stddir, extfile):
                      stddir + stdname + '.dat' , extfile,
                      float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
-
+'''
 
 def calibrate(scifiles, extfile, observatory):
     for f in scifiles:
@@ -1218,8 +1219,8 @@ def run():
     makebias(fs, obstypes, rawpath)
     
     # get the object name
-    # objname = getobjname(fs, obstypes)
-    objname, stdname = getobjstdname(fs, obstypes, obsclasses)
+    objname = getobjname(fs, obstypes)
+    #objname, stdname = getobjstdname(fs, obstypes, obsclasses)
     
     # Make the text files for the IRAF tasks
     maketxtfiles(fs, obstypes, obsclasses, objname)
@@ -1255,8 +1256,8 @@ def run():
     #rescale_chips(scifiles)
 
     # If standard star, make the sensitivity function
-    # makesensfunc(scifiles, objname, base_stddir, extfile)
-    makesensfunc(scifiles, stdname, base_stddir, extfile)
+    makesensfunc(scifiles, objname, base_stddir, extfile)
+    # makesensfunc(scifiles, stdname, base_stddir, extfile)
     
     # Flux calibrate the spectrum
     calibrate(scifiles, extfile, observatory)
