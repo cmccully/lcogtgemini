@@ -249,7 +249,7 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
     std_flux = magtoflux(std_wave, std_mag, stdzp)
 
     # Get the typical bandpass of the standard star,
-    std_bandpass = np.diff(std_wave).mean()
+    std_bandpass = np.max([50.0, np.diff(std_wave).mean()])
     # Smooth the observed spectrum to that bandpass
     obs_flux = boxcar_smooth(obs_wave, obs_flux, std_bandpass)
     # read in the extinction file (leave in magnitudes)
@@ -984,7 +984,7 @@ def crreject(scifiles):
         nd = dsort.shape[0]
         # Calculate the difference between the 16th and 84th percentiles to be 
         # robust against outliers
-        dsig = (dsort[0.84 * nd] - dsort[0.16 * nd]) / 2.0
+        dsig = (dsort[int(round(0.84 * nd))] - dsort[int(round(0.16 * nd))]) / 2.0
         pssl = (dsig * dsig - readnoise * readnoise)
 
         mask = d == 0.0
@@ -1073,6 +1073,7 @@ def rescale_chips(scifiles):
         hdu.flush()
         hdu.close()
 
+
 def makesensfunc(scifiles, objname, base_stddir, extfile):
     #TODO use individual standard star observations in each setting, not just red and blue
     for f in scifiles:
@@ -1093,6 +1094,7 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
                      stddir + objname + '.dat' , extfile,
                      float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
+
 
 def calibrate(scifiles, extfile, observatory):
     for f in scifiles:
@@ -1163,7 +1165,7 @@ def run():
     fs = sort()
     
     # Change into the reduction directory
-    iraf.chdir('work')
+    iraf.cd('work')
 
     # Initialize variables that depend on which site was used
     extfile, observatory, base_stddir, rawpath = init_northsouth(fs, topdir, rawpath)
@@ -1256,7 +1258,7 @@ def run():
     rescale1e15(objname + '.fits')
     
     # Change out of the reduction directory
-    iraf.chdir('..')
+    iraf.cd('..')
 
 
 if __name__ == "__main__":
