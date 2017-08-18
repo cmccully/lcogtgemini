@@ -6,7 +6,6 @@ Created on Nov 7, 2014
 '''
 import os
 from glob import glob
-import pyfits
 import numpy as np
 from astroscrappy import detect_cosmics
 from pyraf import iraf
@@ -15,6 +14,8 @@ import pf_model as pfm
 import statsmodels as sm
 from astropy.modeling import models, fitting
 import astropy
+from matplotlib import pyplot
+from astropy.io.fits import PrimaryHDU, HDUList
 
 iraf.cd(os.getcwd())
 iraf.gemini()
@@ -167,7 +168,6 @@ def sanitizeheader(hdr):
 
 def tofits(filename, data, hdr=None, clobber=False):
     """simple pyfits wrapper to make saving fits files easier."""
-    from pyfits import PrimaryHDU, HDUList
     hdu = PrimaryHDU(data)
     if not (hdr is None):
         hdu.header += hdr
@@ -190,7 +190,7 @@ def fluxtomag(flux):
 
 
 def spectoascii(infilename, outfilename):
-    hdu = pyfits.open(infilename)
+    hdu = fits.open(infilename)
     try:
         lam = fitshdr_to_wave(hdu['SCI'].header.copy())
         flux = hdu['SCI'].data.copy()
@@ -207,7 +207,7 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
              stdzp=3.68e-20, thresh=8, clobber=True):
 
     # read in the specfile and create a spectrum object
-    obs_hdu = pyfits.open(specfile)
+    obs_hdu = fits.open(specfile)
     try:
         obs_flux = obs_hdu[2].data.copy()[0]
         obs_hdr = obs_hdu[2].header.copy()
@@ -293,7 +293,7 @@ def cut_gs_image(filename, output_filename, pixel_range):
                         given in binned pixels
     :return:
     """
-    hdu = pyfits.open(filename, unit16=True)
+    hdu = fits.open(filename, unit16=True)
     for i in range(1, 13):
         ccdsum = hdu[i].header['CCDSUM']
         ccdsum = np.array(ccdsum.split(), dtype=np.int)
@@ -356,7 +356,7 @@ def get_chipedges(data):
 
 def split1d(filename):
 
-    hdu = pyfits.open(filename)
+    hdu = fits.open(filename)
     chipedges = get_chipedges(hdu['SCI'].data[0])
     lam = fitshdr_to_wave(hdu['SCI'].header)
     # Copy each of the chips out seperately. Note that iraf is 1 indexed
@@ -375,7 +375,7 @@ def mask_chipedges(filename):
     :param filename: Name of file that contains the spectrum
     :return:
     """
-    hdu = pyfits.open(filename, mode='update')
+    hdu = fits.open(filename, mode='update')
     chip_edges = get_chipedges(hdu['SCI'].data[0])
     print(chip_edges)
     # Set the data = 0 in the chip gaps
@@ -469,7 +469,7 @@ def speccombine(fs, outfile):
     specs = np.zeros((nfs, nsteps))
     specerrs = np.zeros((nfs, nsteps))
     for i, f in enumerate(fs):
-        hdu = pyfits.open(f)
+        hdu = fits.open(f)
         lam = fitshdr_to_wave(hdu[0].header.copy())
 
         # interpolate each spectrum onto a common wavelength scale
@@ -541,7 +541,7 @@ def mktelluric(filename):
     #TODO Try fitting a black body instead of interpolating.
     # if it is a standard star combined file
     # read in the spectrum and calculate the wavelengths of the pixels
-    hdu = pyfits.open(filename)
+    hdu = fits.open(filename)
     spec = hdu[0].data.copy()
     hdr = hdu[0].header.copy()
     hdu.close()
@@ -609,7 +609,7 @@ def telluric(filename, outfile):
     # Get the standard to use for telluric correction
     stdfile = 'telcor.dat'
     
-    hdu = pyfits.open(filename)
+    hdu = fits.open(filename)
     spec = hdu[0].data.copy()
     hdr = hdu[0].header.copy()
     hdu.close()
@@ -704,7 +704,7 @@ def init_northsouth(fs, topdir, rawpath):
     observatory = 'Gemini-North'
 
     global is_GS
-    is_GS = pyfits.getval(fs[0], 'DETECTOR') == 'GMOS + Hamamatsu'
+    is_GS = fits.getval(fs[0], 'DETECTOR') == 'GMOS + Hamamatsu'
     if is_GS:
         global dooverscan
         dooverscan = True
@@ -723,8 +723,8 @@ def getobstypes(fs):
     obstypes = []
     obsclasses = []
     for f in fs: 
-        obstypes.append(pyfits.getval(f, 'OBSTYPE', ext=0))
-        obsclasses.append(pyfits.getval(f, 'OBSCLASS', ext=0))
+        obstypes.append(fits.getval(f, 'OBSTYPE', ext=0))
+        obsclasses.append(fits.getval(f, 'OBSCLASS', ext=0))
         
     obstypes = np.array(obstypes)
     obsclasses = np.array(obsclasses)
@@ -747,7 +747,7 @@ def makebias(fs, obstypes, rawpath):
 
 
 def getobjname(fs, obstypes):
-    objname = pyfits.getval(fs[obstypes == 'OBJECT'][0], 'OBJECT', ext=0).lower()
+    objname = fits.getval(fs[obstypes == 'OBJECT'][0], 'OBJECT', ext=0).lower()
     
     # get rid of nonsense in the name (like the plus and whitespace
     objname = objname.replace('+', '')
@@ -766,7 +766,7 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
     for f in fs[goodfiles]:
         # put the filename in the correct text file.
         obsstr = ''
-        obstype = pyfits.getval(f, 'OBSTYPE', ext=0)
+        obstype = fits.getval(f, 'OBSTYPE', ext=0)
         if obstype != 'OBJECT':
             obsstr = '.' + obstype.lower()
             expnum = ''
@@ -776,9 +776,9 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
         # Drop the raw/
         fname = f.split('/')[-1]
         # red or blue setting
-        redblue = pyfits.getval(f, 'GRATING')[0].lower()
+        redblue = fits.getval(f, 'GRATING')[0].lower()
         # central wavelength
-        lamcentral = pyfits.getval(f, 'CENTWAVE')
+        lamcentral = fits.getval(f, 'CENTWAVE')
 
         txtname = '%s.%s%s%i%s.txt' % (objname, str(expnum), redblue, lamcentral, obsstr)
         # If more than one arc or flat, append to the text file 
@@ -854,7 +854,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
             iraf.unlearn(iraf.gmosaic)
             iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4]+'.mos.fits')
 
-        flat_hdu = pyfits.open(f[:-4] + '.mos.fits')
+        flat_hdu = fits.open(f[:-4] + '.mos.fits')
 
         data = np.median(flat_hdu['SCI'].data, axis=0)
         chip_edges = get_chipedges(data)
@@ -875,7 +875,6 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         fit = pfm.pffit(fitme_x, fitme_y, 15, 7, robust=True,
                     M=sm.robust.norms.AndrewWave())
         if plot:
-            from matplotlib import pyplot
             pyplot.ion()
             pyplot.clf()
             pyplot.plot(x, y)
@@ -952,8 +951,8 @@ def scireduce(scifiles, rawpath):
             iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits')
 
         # Flat field the image
-        hdu = pyfits.open(f[:-4]+'.fits', mode='update')
-        hdu['SCI'].data /= pyfits.getdata(setupname+'.flat.fits', extname='SCI')
+        hdu = fits.open(f[:-4]+'.fits', mode='update')
+        hdu['SCI'].data /= fits.getdata(setupname+'.flat.fits', extname='SCI')
         hdu.flush()
         hdu.close()
 
@@ -975,7 +974,7 @@ def skysub(scifiles, rawpath):
 def crreject(scifiles):
     for f in scifiles:
         # run lacosmicx
-        hdu = pyfits.open('st' + f.replace('.txt', '.fits'))
+        hdu = fits.open('st' + f.replace('.txt', '.fits'))
 
         readnoise = 3.5
         # figure out what pssl should be approximately
@@ -1012,7 +1011,7 @@ def extract(scifiles):
                        lsigma=3.0, usigma=3.0, mode='h')
 
         # Trim off below the blue side cut
-        hdu = pyfits.open('et' + f[:-4] +'.fits', mode='update')
+        hdu = fits.open('et' + f[:-4] +'.fits', mode='update')
         lam = fitshdr_to_wave(hdu['SCI'].header)
         w = lam > bluecut
         trimmed_data =np.zeros((1, w.sum()))
@@ -1028,7 +1027,7 @@ def extract(scifiles):
 
 def rescale_chips(scifiles):
     for f in scifiles:
-        hdu = pyfits.open('et'+ f[:-4]+'.fits', mode='update')
+        hdu = fits.open('et'+ f[:-4]+'.fits', mode='update')
         chip_edges = get_chipedges(hdu['SCI'].data)
         lam = fitshdr_to_wave(hdu['SCI'].header)
         x = (lam - lam.min())/ (lam.max() - lam.min())
@@ -1080,7 +1079,7 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
         # If this is a standard star, run standard
         # Standards will have an observation class of either progCal or partnerCal
         # Standards will have an observation class of either progCal or partnerCal
-        obsclass = pyfits.getval(f[:-4] + '.fits', 'OBSCLASS')
+        obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
             # Figure out which directory the stardard star is in
             stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
@@ -1091,8 +1090,8 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
 
             specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
                      stddir + objname + '.dat' , extfile,
-                     float(pyfits.getval(f[:-4] + '.fits', 'AIRMASS')),
-                     float(pyfits.getval(f[:-4] + '.fits', 'EXPTIME')))
+                     float(fits.getval(f[:-4] + '.fits', 'AIRMASS')),
+                     float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
 def calibrate(scifiles, extfile, observatory):
     for f in scifiles:
@@ -1111,15 +1110,15 @@ def updatecomheader(extractedfiles, objname):
     airmasses = []
     exptimes = []
     for f in extractedfiles:
-        airmasses.append(float(pyfits.getval(f, 'AIRMASS')))
-        exptimes.append(float(pyfits.getval(f, 'EXPTIME')))
+        airmasses.append(float(fits.getval(f, 'AIRMASS')))
+        exptimes.append(float(fits.getval(f, 'EXPTIME')))
     
-    pyfits.setval(objname + '_com.fits', 'AIRMASS', value=np.mean(airmasses))
-    pyfits.setval(objname + '_com.fits', 'SLIT', value=pyfits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
+    fits.setval(objname + '_com.fits', 'AIRMASS', value=np.mean(airmasses))
+    fits.setval(objname + '_com.fits', 'SLIT', value=fits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
     
-    comhdu = pyfits.open(objname + '_com.fits', mode='update')
+    comhdu = fits.open(objname + '_com.fits', mode='update')
     
-    extractedhdu = pyfits.open(extractedfiles[0])
+    extractedhdu = fits.open(extractedfiles[0])
     for k in extractedhdu[0].header.keys():
         if not k in comhdu[0].header.keys():
             extractedhdu[0].header.cards[k].verify('fix')
@@ -1128,13 +1127,13 @@ def updatecomheader(extractedfiles, objname):
     comhdu.flush(output_verify='fix')
     comhdu.close()
     extractedhdu.close()
-    dateobs = pyfits.getval(objname + '_com.fits', 'DATE-OBS')
-    dateobs += 'T' + pyfits.getval(objname + '_com.fits', 'TIME-OBS')
-    pyfits.setval(objname + '_com.fits', 'DATE-OBS', value=dateobs)
+    dateobs = fits.getval(objname + '_com.fits', 'DATE-OBS')
+    dateobs += 'T' + fits.getval(objname + '_com.fits', 'TIME-OBS')
+    fits.setval(objname + '_com.fits', 'DATE-OBS', value=dateobs)
 
 def cleanfinal(filename):
     # Clean the data of infs and nans
-    hdu = pyfits.open(filename, mode='update')
+    hdu = fits.open(filename, mode='update')
     hdu[0].data[np.isnan(hdu[0].data)] = 0.0
     hdu[0].data[np.isinf(hdu[0].data)] = 0.0
     hdu.flush()
@@ -1142,7 +1141,7 @@ def cleanfinal(filename):
     
     
 def rescale1e15(filename):
-    hdu = pyfits.open(filename, mode='update')
+    hdu = fits.open(filename, mode='update')
     hdu[0].data *= 1e-15
     hdu.flush()
     hdu.close()
@@ -1238,7 +1237,7 @@ def run():
     updatecomheader(extractedfiles, objname)
     
     # If a standard star, make a telluric correction
-    obsclass = pyfits.getval(objname + '_com.fits', 'OBSCLASS')
+    obsclass = fits.getval(objname + '_com.fits', 'OBSCLASS')
     if obsclass == 'progCal' or obsclass == 'partnerCal':
         # Make telluric
         mktelluric(objname + '_com.fits')
