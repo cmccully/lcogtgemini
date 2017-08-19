@@ -12,7 +12,7 @@ RUN pip install astroscrappy \
         && rm -rf ~/.cache/pip
 
 RUN mkdir /home/gemini && /usr/sbin/groupadd -g 10000 "domainusers" \
-        && /usr/sbin/useradd -g 10000 -d /home/gemini -M -N gemini \
+        && /usr/sbin/useradd -g 10000 -d /home/gemini -M -N -u 10197 gemini \
         && chown -R gemini:domainusers /home/gemini
 
 WORKDIR /lco/
