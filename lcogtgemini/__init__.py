@@ -33,6 +33,8 @@ iraf.set(stdimage='imtgmos')
 
 dooverscan = False
 is_GS = False
+do_qecorr = False
+
 
 def normalize_fitting_coordinate(x):
     xrange = x.max() - x.min()
@@ -280,7 +282,7 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
     cal_hdr['OBJECT'] = 'Sensitivity function for all apertures'
     cal_hdr['CRVAL1'] = obs_wave.min()
     cal_hdr['CRPIX1'] = 1
-    if is_GS:
+    if do_qecorr:
         cal_hdr['QESTATE'] = True
     else:
         cal_hdr['QESTATE'] = False
@@ -711,10 +713,13 @@ def init_northsouth(fs, topdir, rawpath):
     observatory = 'Gemini-North'
 
     global is_GS
-    is_GS = fits.getval(fs[0], 'DETECTOR') == 'GMOS + Hamamatsu'
-    if is_GS:
+    is_GS = fits.getval(fs[0], 'OBSERVAT') == 'Gemini-South'
+    if 'Hamamatsu' in fits.getval(fs[0], 'DETECTOR'):
         global dooverscan
         dooverscan = True
+        global do_qecorr
+        do_qecorr = True
+    if is_GS:
         if not os.path.exists(topdir + '/raw_fixhdr'):
             iraf.mkdir(topdir + '/raw_fixhdr')
         rawpath = '%s/raw_fixhdr/' % topdir
@@ -852,7 +857,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
                       fl_fixpix=False, fl_gsappwave=False, fl_cut=False, fl_title=False,
                       fl_oversize=False)
 
-        if is_GS:
+        if do_qecorr:
             # Renormalize the chips to remove the discrete jump in the
             # sensitivity due to differences in the QE for different chips
             iraf.unlearn(iraf.gqecorr)
@@ -914,7 +919,7 @@ def wavesol(arcfiles, rawpath):
                           cradius=16.0, match=-6, order=7, fitcxord=7,
                           fitcyord=7)
 
-        if is_GS:
+        if do_qecorr:
             # Make an extra random copy so that gqecorr works. Stupid Gemini.
             iraf.cp(f[:-4]+'.fits', f[:-4]+'.arc.fits')
         # transform the CuAr spectrum, for checking that the transformation is OK
@@ -924,7 +929,7 @@ def wavesol(arcfiles, rawpath):
 
 def make_qecorrection(arcfiles):
     for f in arcfiles:
-        if is_GS:
+        if do_qecorr:
             #read in the arcfile name
             with open(f) as txtfile:
                 arcimage = txtfile.readline()
@@ -951,7 +956,7 @@ def scireduce(scifiles, rawpath):
                       fl_over=dooverscan, fl_fixpix='no', fl_flat=False,
                       fl_gmosaic=False, fl_cut=False, fl_gsappwave=False, fl_oversize=False)
 
-        if is_GS:
+        if do_qecorr:
             # Renormalize the chips to remove the discrete jump in the
             # sensitivity due to differences in the QE for different chips
             iraf.unlearn(iraf.gqecorr)
