@@ -742,6 +742,8 @@ def makebias(fs, obstypes, rawpath):
     for f in fs:
         if f[-10:] == '_bias.fits':
             iraf.cp(f, 'bias.fits')
+        elif 'bias' in f:
+            iraf.cp(f, './')
 
     if len(glob('bias*.fits')) == 0:
         bias_files = fs[obstypes == 'BIAS']
