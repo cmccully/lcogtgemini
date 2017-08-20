@@ -207,7 +207,7 @@ def spectoascii(infilename, outfilename):
 def get_binning(txt_filename):
     with open(txt_filename) as f:
         lines = f.readlines()
-    return fits.getval(lines[0], 'CCDSUM', 1).replace(' ', 'x')
+    return fits.getval('../raw/' + lines[0], 'CCDSUM', 1).replace(' ', 'x')
 
 
 def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
@@ -743,7 +743,7 @@ def makebias(fs, obstypes, rawpath):
         if f[-10:] == '_bias.fits':
             iraf.cp(f, 'bias.fits')
 
-    if not os.path.exists('bias.fits'):
+    if len(glob('bias*.fits')) == 0:
         bias_files = fs[obstypes == 'BIAS']
         binnings = [fits.getval(f, 'CCDSUM', 1).replace(' ', 'x') for f in bias_files]
         for binning in list(set(binnings)):
