@@ -839,7 +839,7 @@ def gettxtfiles(fs, objname):
     return flatfiles, arcfiles, scifiles
 
 
-def makemasterflat(flatfiles, rawpath, binnings, plot=True):
+def makemasterflat(flatfiles, rawpath, plot=True):
     # normalize the flat fields
     for f in flatfiles:
         binning = get_binning(f)
