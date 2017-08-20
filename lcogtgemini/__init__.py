@@ -207,7 +207,7 @@ def spectoascii(infilename, outfilename):
 def get_binning(txt_filename):
     with open(txt_filename) as f:
         lines = f.readlines()
-    return fits.getval('../raw/' + lines[0], 'CCDSUM', 1).replace(' ', 'x')
+    return fits.getval('../raw/' + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
 
 
 def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
