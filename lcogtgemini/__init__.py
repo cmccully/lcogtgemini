@@ -15,6 +15,7 @@ import statsmodels as sm
 from astropy.modeling import models, fitting
 import astropy
 from matplotlib import pyplot
+from astropy.io import fits
 from astropy.io.fits import PrimaryHDU, HDUList
 
 iraf.cd(os.getcwd())
