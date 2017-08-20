@@ -839,7 +839,7 @@ def gettxtfiles(fs, objname):
 
 def makemasterflat(flatfiles, rawpath, binnings, plot=True):
     # normalize the flat fields
-    for f in zip(flatfiles):
+    for f in flatfiles:
         binning = get_binning(f)
         # Use IRAF to get put the data in the right format and subtract the
         # bias
@@ -897,6 +897,7 @@ def makemasterflat(flatfiles, rawpath, binnings, plot=True):
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
+        binning = get_binning(f)
         iraf.unlearn(iraf.gsreduce)
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
                       fl_flat=False, bias="bias{binning}".format(binning=binning),
