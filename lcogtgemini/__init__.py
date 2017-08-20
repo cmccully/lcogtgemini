@@ -202,7 +202,13 @@ def spectoascii(infilename, outfilename):
     d[0] = lam
     d[1] = flux
     np.savetxt(outfilename, d.transpose())
-    
+
+def get_binning(txt_filename):
+    with open(txt_filename) as f:
+        lines = f.readlines()
+    return fits.getval(lines[0], 'CCDSUM', 1).replace(' ', 'x')
+
+
 def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
              stdzp=3.68e-20, thresh=8, clobber=True):
 
@@ -737,13 +743,17 @@ def makebias(fs, obstypes, rawpath):
             iraf.cp(f, 'bias.fits')
 
     if not os.path.exists('bias.fits'):
-        # Make the master bias
-        biastxtfile = open('bias.txt', 'w')
-        biasfs = fs[obstypes == 'BIAS']
-        for f in biasfs:
-            biastxtfile.writelines(f.split('/')[-1] + '\n')
-        biastxtfile.close()
-        iraf.gbias('@%s/bias.txt' % os.getcwd(), 'bias', rawpath=rawpath, fl_over=dooverscan)
+        bias_files = fs[obstypes == 'BIAS']
+        binnings = [fits.getval(f, 'CCDSUM', 1).replace(' ', 'x') for f in bias_files]
+        for binning in list(set(binnings)):
+            # Make the master bias
+            biastxtfile = open('bias{binning}.txt'.format(binning=binning), 'w')
+            biasfs = bias_files[np.array(binnings) == binning]
+            for f in biasfs:
+                biastxtfile.writelines(f.split('/')[-1] + '\n')
+            biastxtfile.close()
+            iraf.gbias('@%s/bias{binning}.txt'.format(binning=binning) % os.getcwd(),
+                       'bias{binning}'.format(binning=binning), rawpath=rawpath, fl_over=dooverscan)
 
 
 def getobjname(fs, obstypes):
@@ -826,16 +836,16 @@ def gettxtfiles(fs, objname):
     return flatfiles, arcfiles, scifiles
 
 
-def makemasterflat(flatfiles, rawpath, plot=True):
+def makemasterflat(flatfiles, rawpath, binnings, plot=True):
     # normalize the flat fields
-    for f in flatfiles:
-
+    for f in zip(flatfiles):
+        binning = get_binning(f)
         # Use IRAF to get put the data in the right format and subtract the
         # bias
         # This will currently break if multiple flats are used for a single setting
         iraf.unlearn(iraf.gsreduce)
         iraf.gsreduce('@' + f, outimages = f[:-4]+'.mef.fits',rawpath=rawpath,
-                      bias="bias", fl_over=dooverscan, fl_flat=False, fl_gmosaic=False,
+                      bias="bias{binning}".format(binning=binning), fl_over=dooverscan, fl_flat=False, fl_gmosaic=False,
                       fl_fixpix=False, fl_gsappwave=False, fl_cut=False, fl_title=False,
                       fl_oversize=False)
 
@@ -888,7 +898,7 @@ def wavesol(arcfiles, rawpath):
     for f in arcfiles:
         iraf.unlearn(iraf.gsreduce)
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
-                      fl_flat=False, bias="bias",
+                      fl_flat=False, bias="bias{binning}".format(binning=binning),
                       fl_fixpix=False, fl_over=dooverscan, fl_cut=False, fl_gmosaic=True,
                       fl_gsappwave=True, fl_oversize=False)
 
@@ -929,10 +939,11 @@ def getredorblue(f):
 
 def scireduce(scifiles, rawpath):
     for f in scifiles:
+        binning = get_binning(f)
         setupname = getsetupname(f)
         # gsreduce subtracts bias and mosaics detectors
         iraf.unlearn(iraf.gsreduce)
-        iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias="bias",
+        iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias="bias{binning}".format(binning=binning),
                       fl_over=dooverscan, fl_fixpix='no', fl_flat=False,
                       fl_gmosaic=False, fl_cut=False, fl_gsappwave=False, fl_oversize=False)
 
