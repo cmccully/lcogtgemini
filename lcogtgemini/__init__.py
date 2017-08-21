@@ -333,9 +333,9 @@ def cut_gs_image(filename, output_filename, pixel_range):
         numpix = pixel_range[1] - pixel_range[0]
 
         x_bias_section = get_x_pixel_range(hdu[i].header['BIASSEC'])
-        hdu[i].header['BIASSEC'] = hdr_pixel_range(x_bias_section[0], x_bias_section[1], 1, numpix)
+        hdu[i].header['BIASSEC'] = hdr_pixel_range(int(x_bias_section[0]), int(x_bias_section[1]), 1, numpix)
         x_data_section = get_x_pixel_range(hdu[i].header['DATASEC'])
-        hdu[i].header['DATASEC'] = hdr_pixel_range(x_data_section[0], x_data_section[1], 1, numpix)
+        hdu[i].header['DATASEC'] = hdr_pixel_range(int(x_data_section[0]), int(x_data_section[1]), 1, numpix)
 
         hdu[i].data = hdu[i].data[pixel_range[0]:pixel_range[1], :]
 
