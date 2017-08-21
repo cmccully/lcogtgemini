@@ -206,10 +206,10 @@ def spectoascii(infilename, outfilename):
     d[1] = flux
     np.savetxt(outfilename, d.transpose())
 
-def get_binning(txt_filename):
+def get_binning(txt_filename, rawpath):
     with open(txt_filename) as f:
         lines = f.readlines()
-    return fits.getval('../raw/' + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
+    return fits.getval(rawpath + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
 
 
 def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
@@ -847,7 +847,7 @@ def gettxtfiles(fs, objname):
 def makemasterflat(flatfiles, rawpath, plot=True):
     # normalize the flat fields
     for f in flatfiles:
-        binning = get_binning(f)
+        binning = get_binning(f, rawpath)
         # Use IRAF to get put the data in the right format and subtract the
         # bias
         # This will currently break if multiple flats are used for a single setting
@@ -904,7 +904,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
-        binning = get_binning(f)
+        binning = get_binning(f, rawpath)
         iraf.unlearn(iraf.gsreduce)
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
                       fl_flat=False, bias="bias{binning}".format(binning=binning),
@@ -948,7 +948,7 @@ def getredorblue(f):
 
 def scireduce(scifiles, rawpath):
     for f in scifiles:
-        binning = get_binning(f)
+        binning = get_binning(f, rawpath)
         setupname = getsetupname(f)
         # gsreduce subtracts bias and mosaics detectors
         iraf.unlearn(iraf.gsreduce)

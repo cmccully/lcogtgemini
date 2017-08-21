@@ -17,6 +17,9 @@ RUN mkdir /home/gemini && /usr/sbin/groupadd -g 10000 "domainusers" \
 
 WORKDIR /lco/
 
+RUN wget http://www.gemini.edu/sciops/data/software/gmoss_fix_headers.py \
+        && chmod +x gmoss_fix_headers.py
+
 RUN git clone https://github.com/cmccully/pf_model.git
 
 WORKDIR /lco/pf_model
@@ -31,7 +34,8 @@ USER gemini
 
 RUN mkdir /home/gemini/iraf
 
-ENV HOME=/home/gemini iraf=/opt/conda/iraf/ IRAFARCH=linux IRAF_EXTPKG=/opt/conda/extern.pkg TERM=xgterm
+ENV HOME=/home/gemini iraf=/opt/conda/iraf/ IRAFARCH=linux IRAF_EXTPKG=/opt/conda/extern.pkg TERM=xgterm \
+        PATH="/lco/:${PATH}"
 
 WORKDIR /home/gemini/iraf
 
