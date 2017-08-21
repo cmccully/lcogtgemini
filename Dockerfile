@@ -1,8 +1,11 @@
 FROM docker.lco.global/miniconda2:4.2.12
 MAINTAINER Curtis McCully <cmccully@lco.global>
 
-RUN yum -y install epel-release gcc glibc.i686 xorg-x11-apps\
+RUN yum -y install epel-release gcc glibc.i686 xorg-x11-apps mesa-libGL.x86_64 mesa-libGL.i686 \
         && yum -y clean all
+
+# Fix for x11 forwarding
+RUN dbus-uuidgen > /etc/machine-id
 
 RUN conda install -y pip numpy astropy ipython matplotlib scipy statsmodels \
         && conda install -y -c http://ssb.stsci.edu/astroconda iraf-all pyraf-all stsci gemini \
