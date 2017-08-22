@@ -1038,7 +1038,7 @@ def extract(scifiles):
                        border=2, bnaverage=-3, bniterate=2, blow_reject=2.0,
                        bhigh_reject=2.0, long_bsample='-100:-40,40:100',
                        background='fit', weights='variance',
-                       lsigma=3.0, usigma=3.0, tnsum=-50, tstep=50, mode='h')
+                       lsigma=3.0, usigma=3.0, tnsum=50, tstep=50, mode='h')
 
         # Trim off below the blue side cut
         hdu = fits.open('et' + f[:-4] +'.fits', mode='update')
