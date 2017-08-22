@@ -321,14 +321,12 @@ def cut_gs_image(filename, output_filename, pixel_range):
         y_ccdsec = [(pixel_range[0]  * ccdsum[1]) + 1,
                     (pixel_range[1]) * ccdsum[1]]
 
-        detsec = hdr_pixel_range(512 * (i - 1) + 1, 512 * i,
-                                 y_ccdsec[0], y_ccdsec[1])
-        hdu[i].header['DETSEC'] = detsec
+        x_detector_section = get_x_pixel_range(hdu[i].header['DETSEC'])
+        hdu[i].header['DETSEC'] = hdr_pixel_range(int(x_detector_section[0]), int(x_detector_section[1]), y_ccdsec[0], y_ccdsec[1])
 
-        ccdsec = hdr_pixel_range(512 * ((i - 1) % 4) + 1, 512 * ((i - 1) % 4 + 1),
-                                 y_ccdsec[0], y_ccdsec[1])
+        x_ccd_section = get_x_pixel_range(hdu[i].header['CCDSEC'])
+        hdu[i].header['CCDSEC'] = hdr_pixel_range(int(x_ccd_section[0]), int(x_ccd_section[1]), y_ccdsec[0], y_ccdsec[1])
 
-        hdu[i].header['CCDSEC'] = ccdsec
 
         numpix = pixel_range[1] - pixel_range[0]
 
