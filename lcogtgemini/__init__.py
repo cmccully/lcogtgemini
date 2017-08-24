@@ -729,8 +729,8 @@ def init_northsouth(fs, topdir, rawpath):
     if is_GS:
         if not os.path.exists(topdir + '/raw_fixhdr'):
             iraf.mkdir(topdir + '/raw_fixhdr')
-        rawpath = '%s/raw_fixhdr/' % topdir
-        os.system('gmoss_fix_headers.py --files="%s/raw/*.fits" --destination=%s' % (topdir, rawpath))
+        #rawpath = '%s/raw_fixhdr/' % topdir
+        #os.system('gmoss_fix_headers.py --files="%s/raw/*.fits" --destination=%s' % (topdir, rawpath))
         base_stddir = 'ctionewcal/'
         observatory = 'Gemini-South'
         extfile = iraf.osfn('gmisc$lib/onedstds/ctioextinct.dat') 
