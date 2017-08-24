@@ -35,6 +35,7 @@ dooverscan = False
 is_GS = False
 do_qecorr = False
 dobias = False
+dodq = False
 
 
 def normalize_fitting_coordinate(x):
@@ -768,7 +769,7 @@ def makebias(fs, obstypes, rawpath):
             biastxtfile.close()
             iraf.gbias('@%s/bias{binning}.txt'.format(binning=binning) % os.getcwd(),
                        'bias{binning}'.format(binning=binning), rawpath=rawpath, fl_over=dooverscan,
-                       fl_vardq=True)
+                       fl_vardq=dodq)
 
 
 def getobjname(fs, obstypes):
@@ -866,7 +867,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         iraf.gsreduce('@' + f, outimages = f[:-4]+'.mef.fits',rawpath=rawpath, fl_bias=dobias,
                       bias=biasfile, fl_over=dooverscan, fl_flat=False, fl_gmosaic=False,
                       fl_fixpix=False, fl_gsappwave=False, fl_cut=False, fl_title=False,
-                      fl_oversize=False, fl_vardq=True)
+                      fl_oversize=False, fl_vardq=dodq)
 
         if do_qecorr:
             # Renormalize the chips to remove the discrete jump in the
@@ -875,13 +876,13 @@ def makemasterflat(flatfiles, rawpath, plot=True):
 
             iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True,
                          refimages=f[:-4].replace('flat', 'arc.arc.fits'),
-                         corrimages=f[:-9] +'.qe.fits', verbose=True, fl_vardq=True)
+                         corrimages=f[:-9] +'.qe.fits', verbose=True, fl_vardq=dodq)
 
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True, fl_clean=False)
+            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=dodq, fl_clean=False)
         else:
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True, fl_clean=False)
+            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=dodq, fl_clean=False)
 
         flat_hdu = fits.open(f[:-4] + '.mos.fits')
 
@@ -924,7 +925,7 @@ def wavesol(arcfiles, rawpath):
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
                       fl_flat=False, bias=bias_filename, fl_bias=dobias,
                       fl_fixpix=False, fl_over=dooverscan, fl_cut=False, fl_gmosaic=True,
-                      fl_gsappwave=True, fl_oversize=False, fl_vardq=True)
+                      fl_gsappwave=True, fl_oversize=False, fl_vardq=dodq)
 
 
         # determine wavelength calibration -- 1d and 2d
@@ -952,7 +953,7 @@ def make_qecorrection(arcfiles):
                 arcimage = 'g' + arcimage.split('\n')[0]
             if not os.path.exists(f[:-8] +'.qe.fits'):
                 iraf.gqecorr(arcimage, refimages=f[:-4]+'.arc.fits', fl_correct=False, fl_keep=True,
-                             corrimages=f[:-8] +'.qe.fits', verbose=True, fl_vardq=True)
+                             corrimages=f[:-8] +'.qe.fits', verbose=True, fl_vardq=dodq)
 
 def getsetupname(f):
     # Get the setup base name by removing the exposure number
@@ -973,20 +974,20 @@ def scireduce(scifiles, rawpath):
         iraf.unlearn(iraf.gsreduce)
         iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias=bias_filename, fl_bias=dobias,
                       fl_over=dooverscan, fl_fixpix='no', fl_flat=False, fl_gmosaic=False, fl_cut=False,
-                      fl_gsappwave=False, fl_oversize=False, fl_vardq=True)
+                      fl_gsappwave=False, fl_oversize=False, fl_vardq=dodq)
 
         if do_qecorr:
             # Renormalize the chips to remove the discrete jump in the
             # sensitivity due to differences in the QE for different chips
             iraf.unlearn(iraf.gqecorr)
-            iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True, fl_vardq=True,
+            iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True, fl_vardq=dodq,
                          refimages=setupname + '.arc.arc.fits', corrimages=setupname +'.qe.fits', verbose=True)
 
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4] +'.fits', fl_vardq=True, fl_clean=False)
+            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4] +'.fits', fl_vardq=dodq, fl_clean=False)
         else:
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits', fl_vardq=True, fl_clean=False)
+            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits', fl_vardq=dodq, fl_clean=False)
 
         # Flat field the image
         hdu = fits.open(f[:-4]+'.fits', mode='update')
@@ -996,7 +997,7 @@ def scireduce(scifiles, rawpath):
 
         # Transform the data based on the arc  wavelength solution
         iraf.unlearn(iraf.gstransform)
-        iraf.gstransform(f[:-4], wavtran=setupname + '.arc', fl_vardq=True)
+        iraf.gstransform(f[:-4], wavtran=setupname + '.arc', fl_vardq=dodq)
 
 
 def skysub(scifiles, rawpath):
@@ -1005,7 +1006,7 @@ def skysub(scifiles, rawpath):
         # output has an s prefixed on the front
         # This step is currently quite slow for Gemini-South data
         iraf.unlearn(iraf.gsskysub)
-        iraf.gsskysub('t' + f[:-4], long_sample='*', fl_inter='no', fl_vardq=True,
+        iraf.gsskysub('t' + f[:-4], long_sample='*', fl_inter='no', fl_vardq=dodq,
                       naverage=-10, order=1, low_reject=2.0, high_reject=2.0,
                       niterate=10, mode='h')
     
@@ -1026,7 +1027,9 @@ def crreject(scifiles):
         pssl = (dsig * dsig - readnoise * readnoise)
 
         mask = d == 0.0
-        mask = np.logical_or(mask,  hdu['DQ'].data)
+        mask = np.logical_or(mask, d > (60000.0 * float(hdu[0].header['GAINMULT'])))
+        if dodq:
+            mask = np.logical_or(mask,  hdu['DQ'].data)
 
         crmask, _cleanarr = detect_cosmics(d, inmask=mask, sigclip=4.0,
                                                 objlim=1.0, sigfrac=0.05, gain=1.0,
@@ -1045,7 +1048,7 @@ def extract(scifiles):
     for f in scifiles:    
         iraf.unlearn(iraf.gsextract)
         # Extract the specctrum
-        iraf.gsextract('t' + f[:-4], fl_inter='yes', bfunction='legendre', fl_vardq=True,
+        iraf.gsextract('t' + f[:-4], fl_inter='yes', bfunction='legendre', fl_vardq=dodq,
                        border=2, bnaverage=-3, bniterate=2, blow_reject=2.0,
                        bhigh_reject=2.0, long_bsample='-100:-40,40:100',
                        background='fit', weights='variance',
@@ -1141,7 +1144,7 @@ def calibrate(scifiles, extfile, observatory):
         redorblue = getredorblue(f)
         iraf.unlearn(iraf.gscalibrate)
         iraf.gscalibrate('et' + f[:-4] + '.fits',
-                         sfunc='sens' + redorblue + '.fits', fl_ext=True, fl_vardq=True,
+                         sfunc='sens' + redorblue + '.fits', fl_ext=True, fl_vardq=dodq,
                          extinction=extfile, observatory=observatory)
         
         if os.path.exists('cet' + f[:-4] + '.fits'):
