@@ -34,6 +34,7 @@ iraf.set(stdimage='imtgmos')
 dooverscan = False
 is_GS = False
 do_qecorr = False
+dobias = False
 
 
 def normalize_fitting_coordinate(x):
@@ -858,8 +859,12 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         # bias
         # This will currently break if multiple flats are used for a single setting
         iraf.unlearn(iraf.gsreduce)
-        iraf.gsreduce('@' + f, outimages = f[:-4]+'.mef.fits',rawpath=rawpath,
-                      bias="bias{binning}".format(binning=binning), fl_over=dooverscan, fl_flat=False, fl_gmosaic=False,
+        if dobias:
+            biasfile = "bias{binning}".format(binning=binning)
+        else:
+            biasfile = ''
+        iraf.gsreduce('@' + f, outimages = f[:-4]+'.mef.fits',rawpath=rawpath, fl_bias=dobias,
+                      bias=biasfile, fl_over=dooverscan, fl_flat=False, fl_gmosaic=False,
                       fl_fixpix=False, fl_gsappwave=False, fl_cut=False, fl_title=False,
                       fl_oversize=False, fl_vardq=True)
 
@@ -873,10 +878,10 @@ def makemasterflat(flatfiles, rawpath, plot=True):
                          corrimages=f[:-9] +'.qe.fits', verbose=True, fl_vardq=True)
 
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True)
+            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True, fl_clean=False)
         else:
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True)
+            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4]+'.mos.fits', fl_vardq=True, fl_clean=False)
 
         flat_hdu = fits.open(f[:-4] + '.mos.fits')
 
@@ -912,8 +917,12 @@ def wavesol(arcfiles, rawpath):
     for f in arcfiles:
         binning = get_binning(f, rawpath)
         iraf.unlearn(iraf.gsreduce)
+        if dobias:
+            bias_filename = "bias{binning}".format(binning=binning)
+        else:
+            bias_filename = ''
         iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
-                      fl_flat=False, bias="bias{binning}".format(binning=binning),
+                      fl_flat=False, bias=bias_filename, fl_bias=dobias,
                       fl_fixpix=False, fl_over=dooverscan, fl_cut=False, fl_gmosaic=True,
                       fl_gsappwave=True, fl_oversize=False, fl_vardq=True)
 
@@ -956,9 +965,13 @@ def scireduce(scifiles, rawpath):
     for f in scifiles:
         binning = get_binning(f, rawpath)
         setupname = getsetupname(f)
+        if dobias:
+            bias_filename = "bias{binning}".format(binning=binning)
+        else:
+            bias_filename = ''
         # gsreduce subtracts bias and mosaics detectors
         iraf.unlearn(iraf.gsreduce)
-        iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias="bias{binning}".format(binning=binning),
+        iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias=bias_filename, fl_bias=dobias,
                       fl_over=dooverscan, fl_fixpix='no', fl_flat=False, fl_gmosaic=False, fl_cut=False,
                       fl_gsappwave=False, fl_oversize=False, fl_vardq=True)
 
@@ -970,10 +983,10 @@ def scireduce(scifiles, rawpath):
                          refimages=setupname + '.arc.arc.fits', corrimages=setupname +'.qe.fits', verbose=True)
 
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4] +'.fits', fl_vardq=True)
+            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4] +'.fits', fl_vardq=True, fl_clean=False)
         else:
             iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits', fl_vardq=True)
+            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits', fl_vardq=True, fl_clean=False)
 
         # Flat field the image
         hdu = fits.open(f[:-4]+'.fits', mode='update')
@@ -1199,9 +1212,10 @@ def run():
        
     # Get the observation type
     obstypes, obsclasses = getobstypes(fs)
-    
-    # Make the bias frame
-    makebias(fs, obstypes, rawpath)
+
+    if dobias:
+        # Make the bias frame
+        makebias(fs, obstypes, rawpath)
     
     # get the object name
     objname = getobjname(fs, obstypes)
