@@ -902,7 +902,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         fitme_y = np.append(fitme_y, y[chip_edges[1][0]:chip_edges[1][1]])
         fitme_y = np.append(fitme_y, y[chip_edges[2][0]:chip_edges[2][1]])
 
-        fit = pfm.pffit(fitme_x, fitme_y, 15, 7, robust=True,
+        fit = pfm.pffit(fitme_x, fitme_y, 21, 7, robust=True,
                     M=sm.robust.norms.AndrewWave())
         if plot:
             pyplot.ion()
