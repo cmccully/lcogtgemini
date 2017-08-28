@@ -599,13 +599,16 @@ def mktelluric(filename):
     w = np.logical_and(waves > 3420, waves < 3600)
     bluefit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
     bluewaves = waves < 3420
-    smoothedspec[bluewaves] = bluefit(waves[bluewaves])
+    if len(bluewaves) > 0:
+        smoothedspec[bluewaves] = bluefit(waves[bluewaves])
      
     # Red side
     w = np.logical_and(waves > 8410, waves < 8800)
     redfit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
     redwaves = waves > 8800
-    smoothedspec[redwaves] = redfit(waves[redwaves])
+    if len(redwaves) >0:
+        smoothedspec[redwaves] = redfit(waves[redwaves])
+    
     smoothedspec[not_telluric] = spec[not_telluric]
     # Divide the original and the telluric corrected spectra to
     # get the correction factor
