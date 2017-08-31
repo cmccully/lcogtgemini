@@ -351,11 +351,20 @@ def get_chipedges(data):
         try:
             w = np.where(data == 0.0)[0]
 
+
             # Note we also grow the chip gap by 8 pixels on each side
             # Chip 1
             chip_edges = []
             left_chipedge = 10
             morechips = True
+
+            # This is necessary after speccombine.
+            # If we have only the red side of a spectrum,
+            # the first ~1000 elements of the combined spectrum are 0
+            if len(w) > 1000 and w[1000] == 1000:
+                    blue_cut = np.min(np.where(data > 0))
+                    left_chipedge=blue_cut + 10
+
             while morechips:
                 try:
                     right_chipedge = np.min(w[w > (left_chipedge + 25)]) - 10
@@ -367,6 +376,7 @@ def get_chipedges(data):
                 left_chipedge = np.max(w[w < (right_chipedge + 200)]) + 10
         except:
             chip_edges = []
+
         return chip_edges
 
 
@@ -581,6 +591,7 @@ def mktelluric(filename):
     spec[chip_gaps] = interpolate.splev(waves[chip_gaps], intpr)
 
     not_telluric = telluric_mask(waves)
+
     # Smooth the spectrum so that the spline doesn't go as crazy
     # Use the Savitzky-Golay filter to presevere the edges of the
     # absorption features (both atomospheric and intrinsic to the star)
@@ -588,6 +599,13 @@ def mktelluric(filename):
     # Get the number of data points to set the smoothing criteria for the 
     # spline
     m = not_telluric.sum()
+
+    # If we have only the red side of a spectrum,
+    # the first ~1000 elements of the combined spectrum and noise are 0,
+    # so replace zeros of noise with 1e10 so that weights, w, for the following interpolation are 0
+    if len(noise) > 100 and np.sum(noise[:100]==0.0)==100:
+    	noise[noise<1e-10]=1e10
+
     intpr = interpolate.splrep(waves[not_telluric], sgspec[not_telluric],
                                w=1 / noise[not_telluric], k=2, s=20 * m)
 
@@ -597,17 +615,17 @@ def mktelluric(filename):
     # Extrapolate the ends linearly
     # Blue side
     w = np.logical_and(waves > 3420, waves < 3600)
-    bluefit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
-    bluewaves = waves < 3420
-    if len(bluewaves) > 0:
-        smoothedspec[bluewaves] = bluefit(waves[bluewaves])
+    if len(waves[w]) > 0:
+    	bluefit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
+    	bluewaves = waves < 3420
+    	smoothedspec[bluewaves] = bluefit(waves[bluewaves])
      
     # Red side
     w = np.logical_and(waves > 8410, waves < 8800)
-    redfit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
-    redwaves = waves > 8800
-    if len(redwaves) >0:
-        smoothedspec[redwaves] = redfit(waves[redwaves])
+    if len(waves[w]) > 0:
+    	redfit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
+    	redwaves = waves > 8800
+    	smoothedspec[redwaves] = redfit(waves[redwaves])
     
     smoothedspec[not_telluric] = spec[not_telluric]
     # Divide the original and the telluric corrected spectra to
@@ -639,7 +657,12 @@ def telluric(filename, outfile):
     # to find wavelength shift of standard star.
     w = np.logical_and(waves > 7550., waves < 8410.)
     tw = np.logical_and(telwave > 7550., telwave < 8410.)
-    p = fitxcor(waves[w], spec[w], telwave[tw], telspec[tw])
+    # If the main telluric bands overlap the spectrum, refine the wavelength solution of
+    # the correction using cross correlation.
+    if w.sum() > 5 and tw.sum() > 5:
+	    p = fitxcor(waves[w], spec[w], telwave[tw], telspec[tw])
+    else:
+    	p = [1.0, 0.0]
     # shift and stretch standard star spectrum to match science
     # spectrum.
     telcorr = np.interp(waves, p[0] * telwave + p[1], telspec)
@@ -670,7 +693,7 @@ def xcorfun(p, warr, farr, telwarr, telfarr):
     return np.abs(1.0 / ncor(farr, asfarr))
 
 def fitxcor(warr, farr, telwarr, telfarr):
-    """Maximize the normalized cross correlation coefficient for the telluric
+    """Maximize the normalized cross correlation coefficient for the ic
     correction
     """
     res = optimize.minimize(xcorfun, [1.0, 0.0], method='Nelder-Mead',
@@ -896,6 +919,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         x /= x.max()
 
         y = data / np.median(data)
+
 
         fitme_x = x[chip_edges[0][0]:chip_edges[0][1]]
         fitme_x = np.append(fitme_x, x[chip_edges[1][0]:chip_edges[1][1]])
