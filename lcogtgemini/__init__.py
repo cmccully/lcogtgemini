@@ -693,7 +693,7 @@ def xcorfun(p, warr, farr, telwarr, telfarr):
     return np.abs(1.0 / ncor(farr, asfarr))
 
 def fitxcor(warr, farr, telwarr, telfarr):
-    """Maximize the normalized cross correlation coefficient for the ic
+    """Maximize the normalized cross correlation coefficient for the telluric
     correction
     """
     res = optimize.minimize(xcorfun, [1.0, 0.0], method='Nelder-Mead',
