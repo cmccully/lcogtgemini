@@ -23,6 +23,9 @@ WORKDIR /lco/
 RUN wget http://www.gemini.edu/sciops/data/software/gmoss_fix_headers.py \
         && chmod +x gmoss_fix_headers.py
 
+RUN wget http://ds9.si.edu/download/centos7/ds9.centos7.7.5.tar.gz \
+        && tar -xzvf ds9.centos7.7.5.tar.gz
+
 RUN git clone https://github.com/cmccully/pf_model.git
 
 WORKDIR /lco/pf_model
