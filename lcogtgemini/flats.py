@@ -1,5 +1,11 @@
 import lcogtgemini
-from lcogtgemini import get_binning, get_chipedges
+from lcogtgemini.utils import get_binning
+from lcogtgemini.file_utils import get_images_from_txt_file, getsetupname
+from lcogtgemini import utils
+from pyraf import iraf
+from astropy.io import fits
+import os
+
 
 def reduce_flat(flatfile, rawpath):
 
@@ -9,7 +15,7 @@ def reduce_flat(flatfile, rawpath):
             utils.fixpix(os.path.join(rawpath, image) + '[{i}]'.format(i=i), lcogtgemini.bpm + '[{i}]'.format(i))
 
     binning = get_binning(flatfile, rawpath)
-    setupname = get_setupname(flatfile)
+    setupname = getsetupname(flatfile)
     # Use IRAF to get put the data in the right format and subtract the
     # bias
     # This will currently break if multiple flats are used for a single setting
@@ -38,14 +44,14 @@ def reduce_flat(flatfile, rawpath):
     iraf.unlearn(iraf.gmosaic)
     iraf.gmosaic(mosaic_input, outimages=flatfile[:-4] + '.mos.fits', fl_vardq=lcogtgemini.dodq, fl_clean=False)
     iraf.unlearn(iraf.gstransform)
-    iraf.gstransform(f[:-4]+'.mos.fits', wavtran=setupname + '.arc', fl_vardq=lcogtgemini.dodq)
+    iraf.gstransform(flatfile[:-4]+'.mos.fits', wavtran=setupname + '.arc', fl_vardq=lcogtgemini.dodq)
 
 
 def makemasterflat(flatfiles, rawpath, plot=True):
     # normalize the flat fields
-    for f in flatfiles:
+    for flatfile in flatfiles:
         reduce_flat(f, rawpath)
-        setupname = get_setupname(f)
+        setupname = getsetupname(f)
         flat_hdu = fits.open('t'+ f[:-4] + '.mos.fits')
 
         data = np.median(flat_hdu['SCI'].data, axis=0)
@@ -62,4 +68,4 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         wavelengths_hdu = fits.open(setupname+'.wavelengths.fits')
         for i in range(13):
             unmosaiced_hdu[i].data /= eval_fit(best_fit, wavelengths_hdu[i].data)
-        flat_hdu.writeto(f[:-4] + '.fits')
+        flat_hdu.writeto(flatfile[:-4] + '.fits')

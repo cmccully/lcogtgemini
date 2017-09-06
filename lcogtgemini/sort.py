@@ -1,4 +1,9 @@
 import lcogtgemini
+import numpy as np
+from pyraf import iraf
+import os
+from glob import glob
+from astropy.io import fits
 
 def sort():
     if not os.path.exists('raw'):
@@ -41,9 +46,17 @@ def sort():
 
 def init_northsouth(fs, topdir, rawpath):
     lcogtgemini.is_GS = fits.getval(fs[0], 'OBSERVAT') == 'Gemini-South'
+
     if 'Hamamatsu' in fits.getval(fs[0], 'DETECTOR'):
         lcogtgemini.dooverscan = True
         lcogtgemini.do_qecorr = True
+        lcogtgemini.detector = 'Hamamatsu'
+        if lcogtgemini.is_GS:
+            lcogtgemini.xchip_shifts = [-1.2, 0.0, 0.0]
+            lcogtgemini.ychip_shifts = [0.71, 0.0, -0.73]
+            lcogtgemini.chip_rotations = [0.0, 0.0, 0.0]
+            lcogtgemini.chip_gap_size = 61.0
+
     if lcogtgemini.is_GS:
         base_stddir = 'ctionewcal/'
         observatory = 'Gemini-South'

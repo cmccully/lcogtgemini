@@ -1,13 +1,17 @@
 import lcogtgemini
-from lcogtgemini import utils
+from lcogtgemini import utils, file_utils
+from pyraf import iraf
+import numpy as np
+import os
+from astropy.io import fits
 
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
-        images = get_images_from_txt_file(f)
+        images = file_utils.get_images_from_txt_file(f)
         for image in images:
             for i in range(1, 13):
-                utils.fixpix(os.path.join(rawpath, image)+'[{i}]'.format(i=i), lcogtgemini.bpm+'[{i}]'.format(i))
+                utils.fixpix(os.path.join(rawpath, image)+'[{i}]'.format(i=i), 'bpm.{i}'.format(i=i))
 
         binning = utils.get_binning(f, rawpath)
         iraf.unlearn(iraf.gsreduce)
@@ -38,24 +42,56 @@ def wavesol(arcfiles, rawpath):
 
 def calculate_wavelengths(arcfiles):
     for f in arcfiles:
-        images = get_images_from_txt_file(f)
-        setupname = get_setupname(f)
+        images = file_utils.get_images_from_txt_file(f)
+        setupname = file_utils.get_setupname(f)
+        binning = utils.get_binning(f)
         for image in images:
             hdu = fits.open(image)
             for i in range(1, 13):
-                mosaic_file = mosiac_coordinates(hdu, setupname)
-                hdu[i].data = convert_pixel_list_to_array(mosaic_file)
+                mosaic_file = mosiac_coordinates(hdu, i, setupname, binning)
+                hdu[i].data = utils.convert_pixel_list_to_array(mosaic_file, hdu[i].data.shape[1], hdu[i].data.shape[0])
             hdu.write(setupname + '.wavelengths.fits')
 
 
-def mosiac_coordinates(hdu, setupname):
+def mosiac_coordinates(hdu, i, setupname, binning):
     # Fake mosaicing
     X, Y = np.meshgrid(np.arange(hdu[i].data.shape[1]) + 1, np.arange(hdu[i].data.shape[0]) + 1)
     # Rotate the frame about the center for the given transformation
-    # Add in the X detsec
-    # Add in the chip gaps * (i - 1) // 4
-    # Add in the chip shifts
-    # Write the coordinates to a text file
+    x_center = (hdu[i].data.shape[1] / 2.0) + 0.5
+    y_center = (hdu[i].data.shape[0] / 2.0) + 0.5
+    # Subtract off the center
+    X -= x_center
+    Y -= y_center
 
+    chip_number = (i - 1) // 4
+    rotation = lcogtgemini.chip_rotations[chip_number]
+
+    X = np.cos(np.radians(rotation)) * X - np.sin(np.radians(rotation)) * Y
+    Y = np.sin(np.radians(rotation)) * X - np.cos(np.radians(rotation)) * Y
+
+    # Add back in the chip centers
+    X += x_center
+    Y += y_center
+
+    # Add in the X detsec
+    X += (float(hdu[i].header['DETSEC'][1]) - 1.0) / binning[0]
+
+    # Add in the chip gaps * (i - 1) // 4
+    X += chip_number * lcogtgemini.chip_gap_size / binning[0]
+
+    # Add in the chip shifts
+    X += lcogtgemini.xchip_shifts[chip_number] / binning[0]
+    Y += lcogtgemini.ychip_shifts[chip_number] / binning[1]
+
+    # Write the coordinates to a text file
+    lines_to_write = []
+    for x, y in zip(X.ravel(), Y.ravel()):
+        lines_to_write.append('{x} {y}\n'.format(x=x, y=y))
+
+    pixel_list = setupname+'.{i}.pix.dat'.format(i=i)
+
+    output_wavelength_textfile = setupname + '.waves.dat'
     # Then evaluate the fit coords transformation at each pixel
     iraf.fceval(pixel_list, output_wavelength_textfile, setupname + '.arc_001')
+
+    return output_wavelength_textfile

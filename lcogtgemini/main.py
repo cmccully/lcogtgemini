@@ -1,15 +1,23 @@
 import lcogtgemini
-from lcogtgemini import dobias, makebias, scireduce, skysub, crreject, extract, split1d, spectoascii, speccombine, updatecomheader, \
+from lcogtgemini import makebias, extract, split1d, spectoascii, speccombine, updatecomheader, \
     rescale1e15
-from lcogtgemini.utils import fixpix
+from lcogtgemini.cosmicrays import crreject
+from lcogtgemini.sky import skysub
+from lcogtgemini.reduction import scireduce
+from lcogtgemini.utils import fixpix, get_binning
 from lcogtgemini.qe import make_qecorrection
-from lcogtgemini.wavelengths import wavesol
+from lcogtgemini.wavelengths import wavesol, calculate_wavelengths
 from lcogtgemini.telluric import telluric, mktelluric
 from lcogtgemini.fits_utils import clean_nans
 from lcogtgemini.flats import makemasterflat
 from lcogtgemini.flux_calibration import calibrate, makesensfunc
 from lcogtgemini.file_utils import getobstypes, getobjname, gettxtfiles, maketxtfiles
 from lcogtgemini.sort import sort, init_northsouth
+from lcogtgemini.bpm import get_bad_pixel_mask
+import os
+from astropy.io import fits
+from pyraf import iraf
+from glob import glob
 
 
 def run():
@@ -35,10 +43,6 @@ def run():
     # Get the observation type
     obstypes, obsclasses = getobstypes(fs)
 
-    if dobias:
-        # Make the bias frame
-        makebias(fs, obstypes, rawpath)
-
     # get the object name
     objname = getobjname(fs, obstypes)
 
@@ -47,6 +51,14 @@ def run():
 
     # remember not to put ".fits" on the end of filenames!
     flatfiles, arcfiles, scifiles = gettxtfiles(fs, objname)
+
+    binx, biny = get_binning(scifiles[0], rawpath).split('x')
+
+    get_bad_pixel_mask(int(binx), int(biny))
+
+    if lcogtgemini.dobias:
+        # Make the bias frame
+        makebias(fs, obstypes, rawpath)
 
     # Get the wavelength solution which is apparently needed for everything else
     wavesol(arcfiles, rawpath)

@@ -1,6 +1,24 @@
-from lcogtgemini import xcorfun
+import numpy as np
+import astropy.modeling
+from scipy import optimize
+from statsmodels import robust
 from lcogtgemini.utils import mad
 
+def ncor(x, y):
+    """Calculate the normalized correlation of two arrays"""
+    d = np.correlate(x, x) * np.correlate(y, y)
+
+    return np.correlate(x, y) / d ** 0.5
+
+
+def xcorfun(p, warr, farr, telwarr, telfarr):
+    # Telluric wavelengths and flux
+    # Observed wavelengths and flux
+    # resample the telluric spectrum at the same wavelengths as the observed
+    # spectrum
+    # Make the artifical spectrum to cross correlate
+    asfarr = np.interp(warr, p[0] * telwarr + p[1], telfarr, left=1.0, right=1.0)
+    return np.abs(1.0 / ncor(farr, asfarr))
 
 def normalize_fitting_coordinate(x):
     xrange = x.max() - x.min()
@@ -59,7 +77,7 @@ class blackbody_model(astropy.modeling.Fittable1DModel):
 
 
 # Iterative reweighting linear least squares
-def irls(x, data, errors, model, tol=1e-6, M=sm.robust.norms.AndrewWave(2.0), maxiter=10):
+def irls(x, data, errors, model, tol=1e-6, M=robust.norms.AndrewWave(2.0), maxiter=10):
     fitter = fitting.LevMarLSQFitter()
 
     if x is None:
@@ -145,7 +163,7 @@ def fit_pfm(x, y):
 
     best_fit = fit_pfm(x, y, 21, 7, 1.0, interactive=True)
     fit = pfm.pffit(fitme_x, fitme_y, 21, 7, robust=True,
-                    M=sm.robust.norms.AndrewWave())
+                    M=robust.norms.AndrewWave())
     if plot:
         pyplot.ion()
         pyplot.clf()

@@ -1,4 +1,8 @@
-from lcogtgemini import dooverscan, dodq
+import lcogtgemini
+from glob import glob
+from astropy.io import fits
+from pyraf import iraf
+import numpy as np
 
 
 def makebias(fs, obstypes, rawpath):
@@ -19,5 +23,5 @@ def makebias(fs, obstypes, rawpath):
                 biastxtfile.writelines(f.split('/')[-1] + '\n')
             biastxtfile.close()
             iraf.gbias('@%s/bias{binning}.txt'.format(binning=binning) % os.getcwd(),
-                       'bias{binning}'.format(binning=binning), rawpath=rawpath, fl_over=dooverscan,
-                       fl_vardq=dodq)
+                       'bias{binning}'.format(binning=binning), rawpath=rawpath, fl_over=lcogtgemini.dooverscan,
+                       fl_vardq=lcogtgemini.dodq)

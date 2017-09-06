@@ -4,26 +4,17 @@ Created on Nov 7, 2014
 
 @author: cmccully
 '''
-import astropy
-import numpy as np
-import os
-import pf_model as pfm
-import statsmodels as sm
-from astropy.io import fits
-from astropy.io.fits import PrimaryHDU, HDUList
-from astropy.modeling import models, fitting
-from astroscrappy import detect_cosmics
-from glob import glob
-from matplotlib import pyplot
-from pyraf import iraf
-from scipy import interpolate, ndimage, signal, optimize
 
-from lcogtgemini import normalize_fitting_coordinate, irls, tofits, fitshdr_to_wave
-from lcogtgemini.bias import makebias
+import os
+
+import numpy as np
+from astropy.io import fits
+from pyraf import iraf
+from scipy import optimize
+
 from lcogtgemini.file_utils import getsetupname
 from lcogtgemini.fits_utils import sanitizeheader, tofits, fitshdr_to_wave
-from lcogtgemini.fitting import normalize_fitting_coordinate, offset_left_model, offset_right_model, irls, fitxcor
-from lcogtgemini.main import run
+from lcogtgemini.fitting import offset_left_model, offset_right_model, irls, fitxcor
 from lcogtgemini.utils import magtoflux, fluxtomag, get_binning, fixpix
 
 iraf.cd(os.getcwd())
@@ -253,98 +244,6 @@ def speccombine(fs, outfile):
     iraf.scombine(iraf_filelist, outfile, scale='@scales.dat',
                   reject='avsigclip', lthreshold='INDEF', w1=bluecut)
 
-
-def ncor(x, y):
-    """Calculate the normalized correlation of two arrays"""
-    d = np.correlate(x, x) * np.correlate(y, y)
-
-    return np.correlate(x, y) / d ** 0.5
-
-def xcorfun(p, warr, farr, telwarr, telfarr):
-    # Telluric wavelengths and flux
-    # Observed wavelengths and flux
-    # resample the telluric spectrum at the same wavelengths as the observed
-    # spectrum
-    # Make the artifical spectrum to cross correlate
-    asfarr = np.interp(warr, p[0] * telwarr + p[1], telfarr, left=1.0, right=1.0)
-    return np.abs(1.0 / ncor(farr, asfarr))
-
-
-def scireduce(scifiles, rawpath):
-    for f in scifiles:
-        binning = get_binning(f, rawpath)
-        setupname = getsetupname(f)
-        if dobias:
-            bias_filename = "bias{binning}".format(binning=binning)
-        else:
-            bias_filename = ''
-        # gsreduce subtracts bias and mosaics detectors
-        iraf.unlearn(iraf.gsreduce)
-        iraf.gsreduce('@' + f, outimages=f[:-4]+'.mef', rawpath=rawpath, bias=bias_filename, fl_bias=dobias,
-                      fl_over=dooverscan, fl_fixpix='no', fl_flat=False, fl_gmosaic=False, fl_cut=False,
-                      fl_gsappwave=False, fl_oversize=False, fl_vardq=dodq)
-
-        if do_qecorr:
-            # Renormalize the chips to remove the discrete jump in the
-            # sensitivity due to differences in the QE for different chips
-            iraf.unlearn(iraf.gqecorr)
-            iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True, fl_vardq=dodq,
-                         refimages=setupname + '.arc.arc.fits', corrimages=setupname +'.qe.fits', verbose=True)
-
-            iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.qe.fits', outimages=f[:-4] +'.fits', fl_vardq=dodq, fl_clean=False)
-        else:
-            iraf.unlearn(iraf.gmosaic)
-            iraf.gmosaic(f[:-4]+'.mef.fits', outimages=f[:-4] +'.fits', fl_vardq=dodq, fl_clean=False)
-
-        # Flat field the image
-        hdu = fits.open(f[:-4]+'.fits', mode='update')
-        hdu['SCI'].data /= fits.getdata(setupname+'.flat.fits', extname='SCI')
-        hdu.flush()
-        hdu.close()
-
-        # Transform the data based on the arc  wavelength solution
-        iraf.unlearn(iraf.gstransform)
-        iraf.gstransform(f[:-4], wavtran=setupname + '.arc', fl_vardq=dodq)
-
-
-def skysub(scifiles, rawpath):
-    for f in scifiles:
-        # sky subtraction
-        # output has an s prefixed on the front
-        # This step is currently quite slow for Gemini-South data
-        iraf.unlearn(iraf.gsskysub)
-        iraf.gsskysub('t' + f[:-4], long_sample='*', fl_inter='no', fl_vardq=dodq,
-                      naverage=-10, order=1, low_reject=2.0, high_reject=2.0,
-                      niterate=10, mode='h')
-    
-
-def crreject(scifiles):
-    for f in scifiles:
-        # run lacosmicx
-        hdu = fits.open('st' + f.replace('.txt', '.fits'))
-
-        readnoise = 3.5
-        # figure out what pssl should be approximately
-        d = hdu[2].data.copy()
-        dsort = np.sort(d.ravel())
-        nd = dsort.shape[0]
-        # Calculate the difference between the 16th and 84th percentiles to be 
-        # robust against outliers
-        dsig = (dsort[int(round(0.84 * nd))] - dsort[int(round(0.16 * nd))]) / 2.0
-        pssl = (dsig * dsig - readnoise * readnoise)
-
-        mask = d == 0.0
-        mask = np.logical_or(mask, d > (60000.0 * float(hdu[0].header['GAINMULT'])))
-        if dodq:
-            mask = np.logical_or(mask,  hdu['DQ'].data)
-
-        crmask, _cleanarr = detect_cosmics(d, inmask=mask, sigclip=4.0,
-                                                objlim=1.0, sigfrac=0.05, gain=1.0,
-                                                readnoise=readnoise, pssl=pssl)
-        
-        tofits(f[:-4] + '.lamask.fits', np.array(crmask, dtype=np.uint8), hdr=hdu['SCI'].header.copy())
-        fixpix('t' + f[:-4] + '.fits[2]', f[:-4] + '.lamask.fits')
 
 def extract(scifiles):
     for f in scifiles:    

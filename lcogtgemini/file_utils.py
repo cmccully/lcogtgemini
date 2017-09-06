@@ -1,3 +1,9 @@
+import numpy as np
+from astropy.io import fits
+import os
+from glob import glob
+
+
 def getobstypes(fs):
     # get the type of observation for each file
     obstypes = []
@@ -98,3 +104,9 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
 
         txtfile.write(fname + '\n')
         txtfile.close()
+
+
+def get_images_from_txt_file(filename):
+    with open(filename) as f:
+        lines = f.read().splitlines()
+    return lines

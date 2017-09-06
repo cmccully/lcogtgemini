@@ -1,3 +1,8 @@
+from astropy.io import ascii, fits
+import numpy as np
+from pyraf import iraf
+
+
 def mad(d):
     return np.median(np.abs(np.median(d) - d))
 
@@ -39,3 +44,8 @@ def fixpix(filename, maskname):
     # Run fixpix to interpolate over cosmic rays and bad pixels
     iraf.unlearn(iraf.fixpix)
     iraf.fixpix(filename, maskname, mode='h')
+
+
+def convert_pixel_list_to_array(filename, nx, ny):
+    data = ascii.read(filename)
+    return data.reshape(ny, nx)
