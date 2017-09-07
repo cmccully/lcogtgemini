@@ -5,7 +5,8 @@ from astropy.io import fits
 from lcogtgemini.utils import get_binning
 from lcogtgemini.file_utils import getsetupname
 from pyraf import iraf
-from lcogtgemini import fixpix, dodq, fitshdr_to_wave, bluecut
+from lcogtgemini import fixpix
+from lcogtgemini import fits_utils
 
 
 def scireduce(scifiles, rawpath):
@@ -64,8 +65,8 @@ def extract(scifiles):
 
         # Trim off below the blue side cut
         hdu = fits.open('et' + f[:-4] +'.fits', mode='update')
-        lam = fitshdr_to_wave(hdu['SCI'].header)
-        w = lam > bluecut
+        lam = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
+        w = lam > lcogtgemini.bluecut
         trimmed_data =np.zeros((1, w.sum()))
         trimmed_data[0] = hdu['SCI'].data[0, w]
         hdu['SCI'].data = trimmed_data

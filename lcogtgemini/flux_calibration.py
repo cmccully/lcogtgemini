@@ -1,7 +1,15 @@
-from lcogtgemini import dodq, fitshdr_to_wave, bluecut, get_chipedges, magtoflux, fluxtomag, \
-    sanitizeheader, do_qecorr, tofits
-from lcogtgemini.utils import boxcar_smooth
+import lcogtgemini
+from pyraf import iraf
+import os
+from lcogtgemini.utils import boxcar_smooth, magtoflux, fluxtomag
 from lcogtgemini.file_utils import getredorblue
+from lcogtgemini import fits_utils
+from astropy.io import fits
+from lcogtgemini import combine
+from scipy import ndimage
+from scipy import interpolate
+from scipy import signal
+import numpy as np
 
 
 def calibrate(scifiles, extfile, observatory):
@@ -9,8 +17,8 @@ def calibrate(scifiles, extfile, observatory):
         redorblue = getredorblue(f)
         iraf.unlearn(iraf.gscalibrate)
         iraf.gscalibrate('et' + f[:-4] + '.fits',
-                         sfunc='sens' + redorblue + '.fits', fl_ext=True, fl_vardq=dodq,
-                         extinction=extfile, observatory=observatory)
+                         sfunc='sens' + redorblue + '.fits', fl_ext=True,
+                         fl_vardq=lcogtgemini.dodq, extinction=extfile, observatory=observatory)
 
         if os.path.exists('cet' + f[:-4] + '.fits'):
             iraf.unlearn(iraf.splot)
@@ -51,14 +59,14 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
         obs_flux = obs_hdu[0].data.copy()
         obs_hdr = obs_hdu[0].header.copy()
     obs_hdu.close()
-    obs_wave = fitshdr_to_wave(obs_hdr)
+    obs_wave = fits_utils.fitshdr_to_wave(obs_hdr)
 
     # Mask out everything below 3450 where there is no signal
-    obs_flux = obs_flux[obs_wave >= bluecut]
-    obs_wave = obs_wave[obs_wave >= bluecut]
+    obs_flux = obs_flux[obs_wave >= lcogtgemini.bluecut]
+    obs_wave = obs_wave[obs_wave >= lcogtgemini.bluecut]
 
     # Figure out where the chip gaps are
-    chip_edges = get_chipedges(obs_flux)
+    chip_edges = combine.get_chipedges(obs_flux)
 
     try:
         chip_gaps = np.ones(obs_flux.size, dtype=np.bool)
@@ -99,22 +107,22 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
     fitme_x = (obs_wave - obs_wave.min()) / (obs_wave.max() - obs_wave.min())
     fitme_y = cal_flux / np.median(cal_flux)
     coeffs = pfm.pffit(fitme_x, fitme_y, 5 , 7, robust=True,
-                    M=sm.robust.norms.AndrewWave())
+                    M=robust.norms.AndrewWave())
 
     fitted_flux = pfm.pfcalc(coeffs, fitme_x) * np.median(cal_flux)
 
     cal_mag = -1.0 * fluxtomag(fitted_flux)
     # write the spectra out
-    cal_hdr = sanitizeheader(obs_hdr.copy())
+    cal_hdr = fits_utils.sanitizeheader(obs_hdr.copy())
     cal_hdr['OBJECT'] = 'Sensitivity function for all apertures'
     cal_hdr['CRVAL1'] = obs_wave.min()
     cal_hdr['CRPIX1'] = 1
-    if do_qecorr:
+    if lcogtgemini.do_qecorr:
         cal_hdr['QESTATE'] = True
     else:
         cal_hdr['QESTATE'] = False
 
-    tofits(outfile, cal_mag, hdr=cal_hdr, clobber=True)
+    fits_utils.tofits(outfile, cal_mag, hdr=cal_hdr, clobber=True)
 
 
 def cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave, ext_mag, airmass, exptime):

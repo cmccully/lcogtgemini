@@ -1,5 +1,5 @@
 import lcogtgemini
-from lcogtgemini.combine import split1d, speccombine
+from lcogtgemini.combine import speccombine
 from lcogtgemini.cosmicrays import crreject
 from lcogtgemini.sky import skysub
 from lcogtgemini.reduction import scireduce, extract

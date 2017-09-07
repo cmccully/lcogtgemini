@@ -1,4 +1,13 @@
-from lcogtgemini import fitshdr_to_wave, fitxcor, tofits, get_chipedges
+from lcogtgemini import fits_utils
+from lcogtgemini import fitting
+from lcogtgemini import combine
+from astropy.io import fits
+import numpy as np
+from scipy import signal
+from scipy import ndimage
+from scipy import interpolate
+
+
 # The last wavelength region was originally 9900. I bumped it down to 9800 to make
 # sure we have an anchor point at the end of the spectrum.
 telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
@@ -13,14 +22,14 @@ def telluric(filename, outfile):
     spec = hdu[0].data.copy()
     hdr = hdu[0].header.copy()
     hdu.close()
-    waves = fitshdr_to_wave(hdr)
+    waves = fits_utils.fitshdr_to_wave(hdr)
 
     telwave, telspec = np.genfromtxt(stdfile).transpose()
     # Cross-correlate the standard star and the sci spectra
     # to find wavelength shift of standard star.
     w = np.logical_and(waves > 7550., waves < 8410.)
     tw = np.logical_and(telwave > 7550., telwave < 8410.)
-    p = fitxcor(waves[w], spec[w], telwave[tw], telspec[tw])
+    p = fitting.fitxcor(waves[w], spec[w], telwave[tw], telspec[tw])
     # shift and stretch standard star spectrum to match science
     # spectrum.
     telcorr = np.interp(waves, p[0] * telwave + p[1], telspec)
@@ -33,7 +42,7 @@ def telluric(filename, outfile):
     correct_spec = spec / telcorr
 
     # Copy telluric-corrected data to new file.
-    tofits(outfile, correct_spec, hdr=hdr)
+    fits_utils.tofits(outfile, correct_spec, hdr=hdr)
 
 
 def mktelluric(filename):
@@ -44,10 +53,10 @@ def mktelluric(filename):
     spec = hdu[0].data.copy()
     hdr = hdu[0].header.copy()
     hdu.close()
-    waves = fitshdr_to_wave(hdr)
+    waves = fits_utils.fitshdr_to_wave(hdr)
 
     # Start by interpolating over the chip gaps
-    chip_edges = get_chipedges(spec)
+    chip_edges = combine.get_chipedges(spec)
     chip_gaps = np.ones(spec.size, dtype=np.bool)
     for edge in chip_edges:
         chip_gaps[edge[0]: edge[1]] = False

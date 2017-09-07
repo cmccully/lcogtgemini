@@ -3,7 +3,8 @@ from astropy.io import fits
 from astroscrappy.astroscrappy import detect_cosmics
 
 import lcogtgemini
-from lcogtgemini import tofits, fixpix
+from lcogtgemini.fits_utils import tofits
+from lcogtgemini import fixpix
 
 
 def crreject(scifiles):
