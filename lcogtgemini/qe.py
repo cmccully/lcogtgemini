@@ -1,5 +1,6 @@
 import lcogtgemini
-
+import os
+from pyraf import iraf
 
 def make_qecorrection(arcfiles):
     for f in arcfiles:

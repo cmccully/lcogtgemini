@@ -1,10 +1,10 @@
 import lcogtgemini
-from lcogtgemini import makebias, extract, split1d, spectoascii, speccombine, updatecomheader, \
-    rescale1e15
+from lcogtgemini import extract, split1d, spectoascii, speccombine, updatecomheader, rescale1e15
 from lcogtgemini.cosmicrays import crreject
 from lcogtgemini.sky import skysub
 from lcogtgemini.reduction import scireduce
-from lcogtgemini.utils import fixpix, get_binning
+from lcogtgemini.utils import get_binning
+from lcogtgemini.fixpix import run_fixpix
 from lcogtgemini.qe import make_qecorrection
 from lcogtgemini.wavelengths import wavesol, calculate_wavelengths
 from lcogtgemini.telluric import telluric, mktelluric
@@ -14,6 +14,8 @@ from lcogtgemini.flux_calibration import calibrate, makesensfunc
 from lcogtgemini.file_utils import getobstypes, getobjname, gettxtfiles, maketxtfiles
 from lcogtgemini.sort import sort, init_northsouth
 from lcogtgemini.bpm import get_bad_pixel_mask
+from lcogtgemini.utils import get_y_roi
+from lcogtgemini.bias import makebias
 import os
 from astropy.io import fits
 from pyraf import iraf
@@ -54,7 +56,9 @@ def run():
 
     binx, biny = get_binning(scifiles[0], rawpath).split('x')
 
-    get_bad_pixel_mask(int(binx), int(biny))
+    yroi = get_y_roi(scifiles[0], rawpath)
+
+    get_bad_pixel_mask(int(binx), int(biny), yroi)
 
     if lcogtgemini.dobias:
         # Make the bias frame
@@ -81,9 +85,6 @@ def run():
 
     # Run LA Cosmic
     crreject(scifiles)
-
-    # Fix the cosmic ray pixels
-    fixpix(scifiles)
 
     # Extract the 1D spectrum
     extract(scifiles)

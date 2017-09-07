@@ -1,25 +1,20 @@
 import lcogtgemini
-from lcogtgemini import utils, file_utils
+from lcogtgemini import utils, file_utils, fixpix
 from pyraf import iraf
 import numpy as np
-import os
 from astropy.io import fits
-
+import os
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
-        images = file_utils.get_images_from_txt_file(f)
-        for image in images:
-            for i in range(1, 13):
-                utils.fixpix(os.path.join(rawpath, image)+'[{i}]'.format(i=i), 'bpm.{i}'.format(i=i))
-
+        fixed_rawpath = fixpix.fixpix(f, rawpath)
         binning = utils.get_binning(f, rawpath)
         iraf.unlearn(iraf.gsreduce)
         if lcogtgemini.dobias:
             bias_filename = "bias{binning}".format(binning=binning)
         else:
             bias_filename = ''
-        iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=rawpath,
+        iraf.gsreduce('@' + f, outimages=f[:-4], rawpath=fixed_rawpath,
                       fl_flat=False, bias=bias_filename, fl_bias=lcogtgemini.dobias,
                       fl_fixpix=False, fl_over=lcogtgemini.dooverscan, fl_cut=False, fl_gmosaic=True,
                       fl_gsappwave=True, fl_oversize=False, fl_vardq=lcogtgemini.dodq)
@@ -40,22 +35,25 @@ def wavesol(arcfiles, rawpath):
         iraf.gstransform(f[:-4], wavtran=f[:-4])
 
 
-def calculate_wavelengths(arcfiles):
-    for f in arcfiles:
+def calculate_wavelengths(scifiles, rawpath):
+    for f in scifiles:
         images = file_utils.get_images_from_txt_file(f)
-        setupname = file_utils.get_setupname(f)
-        binning = utils.get_binning(f)
+        setupname = file_utils.getsetupname(f)
+        binning = [float(i) for  i in utils.get_binning(f, rawpath).split('x')]
         for image in images:
-            hdu = fits.open(image)
+            hdu = fits.open(os.path.join(rawpath, image))
             for i in range(1, 13):
+                print('Calculating wavelengths for {setup} for amplifier {amp}'.format(setup=setupname, amp=i))
                 mosaic_file = mosiac_coordinates(hdu, i, setupname, binning)
                 hdu[i].data = utils.convert_pixel_list_to_array(mosaic_file, hdu[i].data.shape[1], hdu[i].data.shape[0])
-            hdu.write(setupname + '.wavelengths.fits')
+            hdu.writeto(setupname + '.wavelengths.fits', clobber=True)
 
 
 def mosiac_coordinates(hdu, i, setupname, binning):
     # Fake mosaicing
     X, Y = np.meshgrid(np.arange(hdu[i].data.shape[1]) + 1, np.arange(hdu[i].data.shape[0]) + 1)
+    X = X.astype(np.float)
+    Y = Y.astype(np.float)
     # Rotate the frame about the center for the given transformation
     x_center = (hdu[i].data.shape[1] / 2.0) + 0.5
     y_center = (hdu[i].data.shape[0] / 2.0) + 0.5
@@ -89,6 +87,8 @@ def mosiac_coordinates(hdu, i, setupname, binning):
         lines_to_write.append('{x} {y}\n'.format(x=x, y=y))
 
     pixel_list = setupname+'.{i}.pix.dat'.format(i=i)
+    with open(pixel_list, 'w') as file_to_write:
+        file_to_write.writelines(lines_to_write)
 
     output_wavelength_textfile = setupname + '.waves.dat'
     # Then evaluate the fit coords transformation at each pixel

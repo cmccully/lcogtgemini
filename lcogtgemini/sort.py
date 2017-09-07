@@ -12,15 +12,11 @@ def sort():
     for f in fs:
         iraf.mv(f, 'raw/')
 
-    sensfs = glob('raw/sens*.fits')
-    if len(sensfs) != 0:
-        for f in sensfs:
-            iraf.mv(f, './')
     # Make a reduction directory
     if not os.path.exists('work'):
         iraf.mkdir('work')
 
-    sensfs = glob('sens*.fits')
+    sensfs = glob('raw/sens*.fits')
     if len(sensfs) != 0:
         for f in sensfs:
             iraf.cp(f, 'work/')
@@ -30,6 +26,10 @@ def sort():
 
     if os.path.exists('raw/bias.fits'):
         iraf.cp('raw/bias.fits', 'work/')
+
+    bpm_file_list = glob('raw/bpm_g?.fits')
+    if len(bpm_file_list) != 0:
+        iraf.cp(bpm_file_list[0], 'work/')
 
     fs = glob('raw/*.qe.fits')
     if len(fs) > 0:

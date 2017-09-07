@@ -1,7 +1,8 @@
 from astropy.io import ascii, fits
 import numpy as np
 from pyraf import iraf
-
+from lcogtgemini import file_utils
+import os
 
 def mad(d):
     return np.median(np.abs(np.median(d) - d))
@@ -16,6 +17,10 @@ def magtoflux(wave, mag, zp):
 def fluxtomag(flux):
     return -2.5 * np.log10(flux)
 
+def get_y_roi(txtfile, rawpath):
+    images = file_utils.get_images_from_txt_file(txtfile)
+    hdu = fits.open(os.path.join(rawpath, images[0]))
+    return [int(i) for i in hdu[1].header['DETSEC'][1:-1].split(',')[1].split(':')]
 
 def boxcar_smooth(spec_wave, spec_flux, smoothwidth):
     # get the average wavelength separation for the observed spectrum
@@ -40,12 +45,6 @@ def get_binning(txt_filename, rawpath):
     return fits.getval(rawpath + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
 
 
-def fixpix(filename, maskname):
-    # Run fixpix to interpolate over cosmic rays and bad pixels
-    iraf.unlearn(iraf.fixpix)
-    iraf.fixpix(filename, maskname, mode='h')
-
-
 def convert_pixel_list_to_array(filename, nx, ny):
     data = ascii.read(filename)
-    return data.reshape(ny, nx)
+    return data['col3'].reshape(ny, nx)

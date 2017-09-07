@@ -15,7 +15,7 @@ from scipy import optimize
 from lcogtgemini.file_utils import getsetupname
 from lcogtgemini.fits_utils import sanitizeheader, tofits, fitshdr_to_wave
 from lcogtgemini.fitting import offset_left_model, offset_right_model, irls, fitxcor
-from lcogtgemini.utils import magtoflux, fluxtomag, get_binning, fixpix
+from lcogtgemini.utils import magtoflux, fluxtomag, get_binning
 
 iraf.cd(os.getcwd())
 iraf.gemini()

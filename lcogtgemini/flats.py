@@ -1,19 +1,15 @@
 import lcogtgemini
 from lcogtgemini.utils import get_binning
-from lcogtgemini.file_utils import get_images_from_txt_file, getsetupname
-from lcogtgemini import utils
+from lcogtgemini.file_utils import getsetupname
+from lcogtgemini import fits_utils
+from lcogtgemini import fixpix
 from pyraf import iraf
 from astropy.io import fits
-import os
 
 
 def reduce_flat(flatfile, rawpath):
 
-    images = get_images_from_txt_file(flatfile)
-    for image in images:
-        for i in range(1, 13):
-            utils.fixpix(os.path.join(rawpath, image) + '[{i}]'.format(i=i), lcogtgemini.bpm + '[{i}]'.format(i))
-
+    fixed_rawpath = fixpix.fixpix(flatfile, rawpath)
     binning = get_binning(flatfile, rawpath)
     setupname = getsetupname(flatfile)
     # Use IRAF to get put the data in the right format and subtract the
@@ -24,7 +20,7 @@ def reduce_flat(flatfile, rawpath):
         biasfile = "bias{binning}".format(binning=binning)
     else:
         biasfile = ''
-    iraf.gsreduce('@' + flatfile, outimages=flatfile[:-4] + '.mef.fits', rawpath=rawpath, fl_bias=lcogtgemini.dobias,
+    iraf.gsreduce('@' + flatfile, outimages=flatfile[:-4] + '.mef.fits', rawpath=fixed_rawpath, fl_bias=lcogtgemini.dobias,
                   bias=biasfile, fl_over=lcogtgemini.dooverscan, fl_flat=False, fl_gmosaic=False,
                   fl_fixpix=False, fl_gsappwave=False, fl_cut=False, fl_title=False,
                   fl_oversize=False, fl_vardq=lcogtgemini.dodq)
@@ -50,12 +46,12 @@ def reduce_flat(flatfile, rawpath):
 def makemasterflat(flatfiles, rawpath, plot=True):
     # normalize the flat fields
     for flatfile in flatfiles:
-        reduce_flat(f, rawpath)
+        reduce_flat(flatfile, rawpath)
         setupname = getsetupname(f)
         flat_hdu = fits.open('t'+ f[:-4] + '.mos.fits')
 
         data = np.median(flat_hdu['SCI'].data, axis=0)
-        wavelengths = hdr2wave(flat_hdu['SCI'].header)
+        wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
         best_fit = fit_pfm(wavelengths, data)
 
         # Open the unmoasiced (and optionally qe corrected flat file)

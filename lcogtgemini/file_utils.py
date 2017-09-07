@@ -64,6 +64,7 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
     # go through each of the files (Ignore bias and aquisition files)
     goodfiles = np.logical_and(obsclasses != 'acqCal', obsclasses != 'acq')
     goodfiles = np.logical_and(goodfiles, obstypes != 'BIAS')
+    goodfiles = np.logical_and(goodfiles, obsclasses != 'dayCal')
 
     for f in fs[goodfiles]:
         # put the filename in the correct text file.
