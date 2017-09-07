@@ -1,6 +1,7 @@
 import lcogtgemini
 from pyraf import iraf
 from astropy.io import fits
+import numpy as np
 
 
 def get_bad_pixel_mask(binx, biny, yroi):
@@ -14,5 +15,9 @@ def get_bad_pixel_mask(binx, biny, yroi):
                 iraf.unlearn('blkavg')
                 iraf.blkavg('bpm.{i}.unbinned.fits[1]'.format(i=i), 'bpm.{i}.fits'.format(i=i), binx, biny)
                 averaged_bpm = fits.open('bpm.{i}.fits'.format(i=i))
-                averaged_bpm[0].data[averaged_bpm[0].data > 0.1] = 1.0
+                # Remove some header keywords from the BPM that confuses fixpix
+                for keyword in ['LTV1', 'LTV2', 'LTM1_1', 'LTM2_2']:
+                    averaged_bpm[0].header.remove(keyword, ignore_missing=True)
+                averaged_bpm[0].data[averaged_bpm[0].data > 0.1] = 1
+                averaged_bpm[0].data = averaged_bpm[0].data.astype(np.uint8)
                 averaged_bpm.writeto('bpm.{i}.fits'.format(i=i), overwrite=True)

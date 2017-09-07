@@ -1,5 +1,8 @@
-from lcogtgemini import fitshdr_to_wave, fitxcor, tofits, get_chipedges, telluricWaves
-
+from lcogtgemini import fitshdr_to_wave, fitxcor, tofits, get_chipedges
+# The last wavelength region was originally 9900. I bumped it down to 9800 to make
+# sure we have an anchor point at the end of the spectrum.
+telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
+                 (6450., 6530.), (6840., 7410.), (7550., 8410.), (8800., 9800.)]
 
 def telluric(filename, outfile):
 
@@ -109,3 +112,4 @@ def telluric_mask(waves):
         not_telluric = np.logical_and(not_telluric,
                                          np.logical_not(in_telluric_region))
     return not_telluric
+

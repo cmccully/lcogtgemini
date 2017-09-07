@@ -35,10 +35,14 @@ def wavesol(arcfiles, rawpath):
         iraf.gstransform(f[:-4], wavtran=f[:-4])
 
 
-def calculate_wavelengths(scifiles, rawpath):
-    for f in scifiles:
+def calculate_wavelengths(arcfiles, rawpath):
+    for f in arcfiles:
         images = file_utils.get_images_from_txt_file(f)
-        setupname = file_utils.getsetupname(f)
+        setupname = file_utils.getsetupname(f, calfile=True)
+        output_file = setupname + '.wavelengths.fits'
+        if os.path.exists(output_file):
+            # short circuit
+            return
         binning = [float(i) for  i in utils.get_binning(f, rawpath).split('x')]
         for image in images:
             hdu = fits.open(os.path.join(rawpath, image))
@@ -46,7 +50,7 @@ def calculate_wavelengths(scifiles, rawpath):
                 print('Calculating wavelengths for {setup} for amplifier {amp}'.format(setup=setupname, amp=i))
                 mosaic_file = mosiac_coordinates(hdu, i, setupname, binning)
                 hdu[i].data = utils.convert_pixel_list_to_array(mosaic_file, hdu[i].data.shape[1], hdu[i].data.shape[0])
-            hdu.writeto(setupname + '.wavelengths.fits', clobber=True)
+            hdu.writeto(output_file, overwrite=True)
 
 
 def mosiac_coordinates(hdu, i, setupname, binning):
@@ -72,7 +76,7 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     Y += y_center
 
     # Add in the X detsec
-    X += (float(hdu[i].header['DETSEC'][1]) - 1.0) / binning[0]
+    X += (float(hdu[i].header['DETSEC'][1:].split(':')[0]) - 1.0) / binning[0]
 
     # Add in the chip gaps * (i - 1) // 4
     X += chip_number * lcogtgemini.chip_gap_size / binning[0]
@@ -83,8 +87,8 @@ def mosiac_coordinates(hdu, i, setupname, binning):
 
     # Write the coordinates to a text file
     lines_to_write = []
-    for x, y in zip(X.ravel(), Y.ravel()):
-        lines_to_write.append('{x} {y}\n'.format(x=x, y=y))
+    for j, k in zip(X.ravel(), Y.ravel()):
+        lines_to_write.append('{x} {y}\n'.format(x=j, y=k))
 
     pixel_list = setupname+'.{i}.pix.dat'.format(i=i)
     with open(pixel_list, 'w') as file_to_write:

@@ -1,14 +1,13 @@
 import lcogtgemini
-from lcogtgemini import extract, split1d, spectoascii, speccombine, updatecomheader, rescale1e15
+from lcogtgemini.combine import split1d, speccombine
 from lcogtgemini.cosmicrays import crreject
 from lcogtgemini.sky import skysub
-from lcogtgemini.reduction import scireduce
-from lcogtgemini.utils import get_binning
-from lcogtgemini.fixpix import run_fixpix
+from lcogtgemini.reduction import scireduce, extract
+from lcogtgemini.utils import get_binning, rescale1e15
 from lcogtgemini.qe import make_qecorrection
 from lcogtgemini.wavelengths import wavesol, calculate_wavelengths
 from lcogtgemini.telluric import telluric, mktelluric
-from lcogtgemini.fits_utils import clean_nans
+from lcogtgemini.fits_utils import clean_nans, updatecomheader, spectoascii
 from lcogtgemini.flats import makemasterflat
 from lcogtgemini.flux_calibration import calibrate, makesensfunc
 from lcogtgemini.file_utils import getobstypes, getobjname, gettxtfiles, maketxtfiles
@@ -72,7 +71,7 @@ def run():
         make_qecorrection(arcfiles)
 
     # Calculate the wavelengths of the unmosaiced data
-    calculate_wavelengths(arcfiles)
+    calculate_wavelengths(arcfiles, rawpath)
 
     # Make the master flat field image
     makemasterflat(flatfiles, rawpath)
@@ -100,18 +99,11 @@ def run():
 
     extractedfiles = glob('cet*.fits')
 
-    # Write the spectra to ascii
-    for f in scifiles:
-        if os.path.exists('cet' + f[:-4] + '.fits'):
-            split1d('cet' + f[:-4] + '.fits')
-            # Make the ascii file
-            spectoascii('cet' + f[:-4] + '.fits',f[:-4] + '.dat')
-
-    # Get all of the extracted files
-    splitfiles = glob('cet*c[1-9].fits')
+    # Telluric Correct
+    telluric_corrected_files = telluric(extractedfiles)
 
     # Combine the spectra
-    speccombine(splitfiles, objname + '_com.fits')
+    speccombine(telluric_corrected_files, objname + '.fits')
 
     # write out the ascii file
     spectoascii(objname + '_com.fits', objname + '_com.dat')
@@ -124,9 +116,12 @@ def run():
     if obsclass == 'progCal' or obsclass == 'partnerCal':
         # Make telluric
         mktelluric(objname + '_com.fits')
+        telluric(extractedfiles)
+        # Telluric Correct
+        telluric_corrected_files = telluric(extractedfiles)
 
-    # Telluric Correct
-    telluric(objname + '_com.fits', objname + '.fits')
+        # Combine the spectra
+        speccombine(telluric_corrected_files, objname + '_com.fits')
 
     #Clean the data of nans and infs
     clean_nans(objname + '.fits')

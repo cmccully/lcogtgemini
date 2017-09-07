@@ -48,3 +48,10 @@ def get_binning(txt_filename, rawpath):
 def convert_pixel_list_to_array(filename, nx, ny):
     data = ascii.read(filename)
     return data['col3'].reshape(ny, nx)
+
+
+def rescale1e15(filename):
+    hdu = fits.open(filename, mode='update')
+    hdu[0].data *= 1e-15
+    hdu.flush()
+    hdu.close()

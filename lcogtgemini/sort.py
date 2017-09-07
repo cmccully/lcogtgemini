@@ -36,6 +36,16 @@ def sort():
         for f in fs:
             iraf.cp(f, 'work/')
 
+    fs = glob('raw/*.wavelengths.fits')
+    if len(fs) > 0:
+        for f in fs:
+            iraf.cp(f, 'work/')
+
+    fs = glob('raw/*.flat.fits')
+    if len(fs) > 0:
+        for f in fs:
+            iraf.cp(f, 'work/')
+
     # make a list of the raw files
     fs = glob('raw/*.fits')
     # Add a ../ in front of all of the file names

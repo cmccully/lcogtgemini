@@ -33,9 +33,14 @@ def getredorblue(f):
     return f.split('.')[1][1]
 
 
-def getsetupname(f):
-    # Get the setup base name by removing the exposure number
-    return f.split('.')[0] + '.' + f.split('.')[1][1:]
+def getsetupname(f, calfile=False):
+    if calfile:
+        setupname = f.split('.')[0] + '.' + f.split('.')[1]
+    else:
+        # Get the setup base name by removing the exposure number
+        setupname = f.split('.')[0] + '.' + f.split('.')[1][1:]
+
+    return setupname
 
 
 def gettxtfiles(fs, objname):
@@ -65,6 +70,9 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
     goodfiles = np.logical_and(obsclasses != 'acqCal', obsclasses != 'acq')
     goodfiles = np.logical_and(goodfiles, obstypes != 'BIAS')
     goodfiles = np.logical_and(goodfiles, obsclasses != 'dayCal')
+    correct_names = np.logical_or([os.path.basename(f)[0] == 'S' for f in fs],
+                                  [os.path.basename(f)[0] == 'N' for f in fs])
+    goodfiles = np.logical_and(correct_names, goodfiles)
 
     for f in fs[goodfiles]:
         # put the filename in the correct text file.

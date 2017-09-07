@@ -26,20 +26,14 @@ RUN mkdir /home/gemini/bin \
 RUN wget http://www.gemini.edu/sciops/data/software/gmoss_fix_headers.py -O /home/gemini/bin/gmoss_fix_headers.py \
         && chmod +x /home/gemini/bin/gmoss_fix_headers.py
 
-RUN git clone https://github.com/cmccully/pf_model.git /home/gemini/src/pf_model
-
-WORKDIR /home/gemini/src/pf_model
-
-RUN python /home/gemini/src/pf_model/setup.py install
-
 USER root
-COPY . /home/gemini/src/gemini
-RUN chown -R gemini:domainusers /home/gemini/src/gemini
+COPY . /home/gemini/src/lcogtgemini
+RUN chown -R gemini:domainusers /home/gemini/src/lcogtgemini
 USER gemini
 
-WORKDIR /home/gemini/src/gemini
+WORKDIR /home/gemini/src/lcogtgemini
 
-RUN python /home/gemini/src/gemini/setup.py install
+RUN python /home/gemini/src/lcogtgemini/setup.py install
 
 RUN mkdir /home/gemini/iraf
 
