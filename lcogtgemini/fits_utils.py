@@ -23,10 +23,10 @@ def sanitizeheader(hdr):
 
 def tofits(filename, data, hdr=None, clobber=False):
     """simple pyfits wrapper to make saving fits files easier."""
-    hdu = PrimaryHDU(data)
+    hdu = fits.PrimaryHDU(data)
     if not (hdr is None):
         hdu.header += hdr
-    hdulist = HDUList([hdu])
+    hdulist = fits.HDUList([hdu])
     hdulist.writeto(filename, overwrite=clobber, output_verify='ignore')
 
 

@@ -12,9 +12,9 @@ def crreject(scifiles):
         # run lacosmicx
         hdu = fits.open('st' + f.replace('.txt', '.fits'))
 
-        readnoise = float(hdu[1].header['RDNOISE'])
+        readnoise = float(hdu[2].header['RDNOISE'])
         # figure out what pssl should be approximately
-        d = hdu[1].data.copy()
+        d = hdu[2].data.copy()
         dsort = np.sort(d.ravel())
         nd = dsort.shape[0]
         # Calculate the difference between the 16th and 84th percentiles to be
