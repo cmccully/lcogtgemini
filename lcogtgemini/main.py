@@ -6,10 +6,11 @@ from lcogtgemini.reduction import scireduce, extract
 from lcogtgemini.utils import get_binning, rescale1e15
 from lcogtgemini.qe import make_qecorrection
 from lcogtgemini.wavelengths import wavesol, calculate_wavelengths
-from lcogtgemini.telluric import telluric, mktelluric
+from lcogtgemini.telluric import telluric_correct, mktelluric, telluric_correction_exists
 from lcogtgemini.fits_utils import clean_nans, updatecomheader, spectoascii
 from lcogtgemini.flats import makemasterflat
-from lcogtgemini.flux_calibration import calibrate, makesensfunc
+from lcogtgemini.flux_calibration import flux_calibrate, makesensfunc
+from lcogtgemini.extinction import correct_for_extinction
 from lcogtgemini.file_utils import getobstypes, getobjname, gettxtfiles, maketxtfiles
 from lcogtgemini.sort import sort, init_northsouth
 from lcogtgemini.bpm import get_bad_pixel_mask
@@ -88,40 +89,35 @@ def run():
     # Extract the 1D spectrum
     extract(scifiles)
 
-    # Rescale the chips based on the science image
-    #rescale_chips(scifiles)
+    # Correct for extinction
+    correct_for_extinction(scifiles, extfile)
 
     # If standard star, make the sensitivity function
-    makesensfunc(scifiles, objname, base_stddir, extfile)
+    makesensfunc(scifiles, objname, base_stddir)
 
     # Flux calibrate the spectrum
-    calibrate(scifiles, extfile, observatory)
+    flux_calibrate(scifiles)
 
-    extractedfiles = glob('cet*.fits')
+    extractedfiles = glob('cxet*.fits')
 
-    # Telluric Correct
-    telluric_corrected_files = telluric(extractedfiles)
+    # If a standard star, make the telluric correction
+    obsclass = fits.getval(objname + '.fits', 'OBSCLASS')
+    if obsclass == 'progCal' or obsclass == 'partnerCal':
+        speccombine(extractedfiles, objname+'.notel.fits')
+        updatecomheader(extractedfiles, objname + '.notel.fits')
+        mktelluric(objname + '.notel.fits', objname, base_stddir)
+
+    if telluric_correction_exists():
+        # Telluric Correct
+        files_to_combine = telluric_correct(extractedfiles)
+    else:
+        files_to_combine = extractedfiles
 
     # Combine the spectra
-    speccombine(telluric_corrected_files, objname + '.fits')
-
-    # write out the ascii file
-    spectoascii(objname + '_com.fits', objname + '_com.dat')
+    speccombine(files_to_combine, objname + '.fits')
 
     # Update the combined file with the necessary header keywords
-    updatecomheader(extractedfiles, objname)
-
-    # If a standard star, make a telluric correction
-    obsclass = fits.getval(objname + '_com.fits', 'OBSCLASS')
-    if obsclass == 'progCal' or obsclass == 'partnerCal':
-        # Make telluric
-        mktelluric(objname + '_com.fits')
-        telluric(extractedfiles)
-        # Telluric Correct
-        telluric_corrected_files = telluric(extractedfiles)
-
-        # Combine the spectra
-        speccombine(telluric_corrected_files, objname + '_com.fits')
+    updatecomheader(extractedfiles, objname + '.fits')
 
     #Clean the data of nans and infs
     clean_nans(objname + '.fits')

@@ -1,19 +1,17 @@
 from lcogtgemini import fits_utils
 from lcogtgemini import fitting
-from lcogtgemini import combine
+from lcogtgemini import flux_calibration
 from astropy.io import fits
 import numpy as np
-from scipy import signal
-from scipy import ndimage
-from scipy import interpolate
+import os
+from astropy.io import ascii
 
 
-# The last wavelength region was originally 9900. I bumped it down to 9800 to make
-# sure we have an anchor point at the end of the spectrum.
-telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
-                 (6450., 6530.), (6840., 7410.), (7550., 8410.), (8800., 9800.)]
+# Taken from Moehler et al 2014 (on eg274)
+telluricWaves = [(5855., 5992.), (6261., 6349.), (6438., 6600.), (6821., 7094.),
+                 (7127., 7434.), (7562., 7731.), (7801., 8613.), (8798., 10338.)]
 
-def telluric(filename, outfile):
+def telluric_correct(filename, outfile):
 
     # Get the standard to use for telluric correction
     stdfile = 'telcor.dat'
@@ -45,80 +43,32 @@ def telluric(filename, outfile):
     fits_utils.tofits(outfile, correct_spec, hdr=hdr)
 
 
-def mktelluric(filename):
-    #TODO Try fitting a black body instead of interpolating.
-    # if it is a standard star combined file
-    # read in the spectrum and calculate the wavelengths of the pixels
-    hdu = fits.open(filename)
-    spec = hdu[0].data.copy()
-    hdr = hdu[0].header.copy()
-    hdu.close()
-    waves = fits_utils.fitshdr_to_wave(hdr)
+def mktelluric(filename, objname, base_stddir):
+    # Read in the standard file
+    standard = flux_calibration.get_standard_file(objname, base_stddir)
+    observed_hdu = fits.open(filename)
+    observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
 
-    # Start by interpolating over the chip gaps
-    chip_edges = combine.get_chipedges(spec)
-    chip_gaps = np.ones(spec.size, dtype=np.bool)
-    for edge in chip_edges:
-        chip_gaps[edge[0]: edge[1]] = False
+    # Interpolate the standard file onto the science wavelengths
+    standard_flux = np.interp(observed_wavelengths, standard['col1'], standard['col2'])
 
-    template_spectrum = signal.savgol_filter(spec, 21, 3)
-    noise = np.abs(spec - template_spectrum)
-    noise = ndimage.filters.gaussian_filter1d(noise, 100.0)
+    # In the telluric regions
+    in_telluric = np.zeros(observed_wavelengths.shape, dtype=bool)
+    for region in telluricWaves:
+        in_region = np.logical_and(observed_wavelengths >= region[0], observed_wavelengths <= region[1])
+        in_telluric[in_region] = True
 
-    # Smooth the chip gaps
-    intpr = interpolate.splrep(waves[np.logical_not(chip_gaps)],
-                               spec[np.logical_not(chip_gaps)],
-                               w=1 / noise[np.logical_not(chip_gaps)], k=2,
-                               s=10 * np.logical_not(chip_gaps).sum())
-    spec[chip_gaps] = interpolate.splev(waves[chip_gaps], intpr)
+    # Divide the observed by the standard
+    # Fill the rest with ones
+    correction = np.ones(observed_wavelengths.shape)
+    correction[in_telluric] = observed_hdu[0].data[in_telluric] / standard_flux
 
-    not_telluric = telluric_mask(waves)
-    # Smooth the spectrum so that the spline doesn't go as crazy
-    # Use the Savitzky-Golay filter to presevere the edges of the
-    # absorption features (both atomospheric and intrinsic to the star)
-    sgspec = signal.savgol_filter(spec, 31, 3)
-    # Get the number of data points to set the smoothing criteria for the
-    # spline
-    m = not_telluric.sum()
-    intpr = interpolate.splrep(waves[not_telluric], sgspec[not_telluric],
-                               w=1 / noise[not_telluric], k=2, s=20 * m)
-
-    # Replace the telluric with the smoothed function
-    smoothedspec = interpolate.splev(waves, intpr)
-
-    # Extrapolate the ends linearly
-    # Blue side
-    w = np.logical_and(waves > 3420, waves < 3600)
-    bluefit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
-    bluewaves = waves < 3420
-    smoothedspec[bluewaves] = bluefit(waves[bluewaves])
-
-    # Red side
-    w = np.logical_and(waves > 8410, waves < 8800)
-    redfit = np.poly1d(np.polyfit(waves[w], spec[w], 1))
-    redwaves = waves > 8800
-    smoothedspec[redwaves] = redfit(waves[redwaves])
-    smoothedspec[not_telluric] = spec[not_telluric]
-    # Divide the original and the telluric corrected spectra to
-    # get the correction factor
-    correction = spec / smoothedspec
-
-    airmass = float(hdr['AIRMASS'])
-    correction = correction ** (airmass ** -0.55)
-    # Save the correction
-    dout = np.ones((2, len(waves)))
-    dout[0] = waves
-    dout[1] = correction
-    np.savetxt('telcor.dat', dout.transpose())
+    # Raise the whole telluric correction to the airmass ** -0.55 power
+    # See matheson's paper. This normalizes things to airmass 1
+    correction **= float(observed_hdu[0].header['AIRMASS']) ** -0.55
+    ascii.write({'wavelengths': observed_wavelengths, 'telluric': correction}, 'telcor.dat',
+                names=['wavelengths', 'telluric'], format='fast_no_header')
 
 
-def telluric_mask(waves):
-    # True where not telluric contaminated
-    not_telluric = np.ones(waves.shape, dtype=np.bool)
-    for wavereg in telluricWaves:
-        in_telluric_region = np.logical_and(waves >= wavereg[0],
-                                            waves <= wavereg[1])
-        not_telluric = np.logical_and(not_telluric,
-                                         np.logical_not(in_telluric_region))
-    return not_telluric
-
+def telluric_correction_exists():
+    return os.path.exists('telcor.dat')

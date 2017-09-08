@@ -27,57 +27,6 @@ def normalize_fitting_coordinate(x):
     return (x - x.min()) / x_range, x.min(), x_range
 
 
-class offset_left_model(astropy.modeling.Fittable1DModel):
-
-    cutoff = astropy.modeling.Parameter(default=0)
-    scale = astropy.modeling.Parameter(default=1)
-
-    c0 = astropy.modeling.Parameter(default=1)
-    c1 = astropy.modeling.Parameter(default=0)
-    c2 = astropy.modeling.Parameter(default=0)
-    c3 = astropy.modeling.Parameter(default=0)
-
-
-    @staticmethod
-    def evaluate(x, cutoff, scale, c0, c1, c2, c3):
-        y = c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-        y[x <= cutoff] *= scale
-
-        return y
-
-
-class offset_right_model(astropy.modeling.Fittable1DModel):
-
-    cutoff = astropy.modeling.Parameter(default=0)
-    scale = astropy.modeling.Parameter(default=1)
-
-    c0 = astropy.modeling.Parameter(default=1)
-    c1 = astropy.modeling.Parameter(default=0)
-    c2 = astropy.modeling.Parameter(default=0)
-    c3 = astropy.modeling.Parameter(default=0)
-
-
-    @staticmethod
-    def evaluate(x, cutoff, scale, c0, c1, c2, c3):
-        y = c0 + c1 * x + c2 * x ** 2 + c3 * x ** 3
-        y[x >= cutoff] *= scale
-
-        return y
-
-
-class blackbody_model(astropy.modeling.Fittable1DModel):
-
-    temperature = astropy.modeling.Parameter(default=10000)
-    normalization = astropy.modeling.Parameter(default=1)
-
-    @staticmethod
-    def evaluate(x, temperature=10000., normalization=1.0):
-        # Note x needs to be in microns and temperature needs to be in K
-        flam = normalization * x ** -5
-        flam /= np.exp(14387.7696 / x / temperature) - 1
-        return flam
-
-
 # Iterative reweighting linear least squares
 def irls(x, data, errors, model_function, initial_parameter_guess, tol=1e-6, weight_function=robust.norms.AndrewWave,
          weight_scale=2.0, maxiter=10):
@@ -151,6 +100,11 @@ def run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale):
     p0 = np.zeros(1 + n_poly + 2 * n_fourier)
     p0[0] = 1.0
 
+    best_fit = run_fit(x, y, errors, function_to_fit, p0, weight_scale)
+
+    return best_fit
+
+def run_fit(x, y, errors, function_to_fit, p0, weight_scale):
     # Run IRLS on the data given the input parameters
     best_fit = irls(x, y, errors, function_to_fit, p0, weight_scale=weight_scale)
 
@@ -158,7 +112,6 @@ def run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale):
     plot_best_fit(x, y, best_fit)
 
     return best_fit
-
 
 def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, weight_scale=2.0):
 

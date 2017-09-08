@@ -107,17 +107,17 @@ def cut_gs_image(filename, output_filename, pixel_range):
     hdu.close()
 
 
-def updatecomheader(extractedfiles, objname):
+def updatecomheader(extractedfiles, filename):
     airmasses = []
     exptimes = []
     for f in extractedfiles:
         airmasses.append(float(fits.getval(f, 'AIRMASS')))
         exptimes.append(float(fits.getval(f, 'EXPTIME')))
 
-    fits.setval(objname + '_com.fits', 'AIRMASS', value=np.mean(airmasses))
-    fits.setval(objname + '_com.fits', 'SLIT', value=fits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
+    fits.setval(filename, 'AIRMASS', value=np.mean(airmasses))
+    fits.setval(filename, 'SLIT', value=fits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
 
-    comhdu = fits.open(objname + '_com.fits', mode='update')
+    comhdu = fits.open(filename, mode='update')
 
     extractedhdu = fits.open(extractedfiles[0])
     for k in extractedhdu[0].header.keys():
@@ -128,9 +128,9 @@ def updatecomheader(extractedfiles, objname):
     comhdu.flush(output_verify='fix')
     comhdu.close()
     extractedhdu.close()
-    dateobs = fits.getval(objname + '_com.fits', 'DATE-OBS')
-    dateobs += 'T' + fits.getval(objname + '_com.fits', 'TIME-OBS')
-    fits.setval(objname + '_com.fits', 'DATE-OBS', value=dateobs)
+    dateobs = fits.getval(filename, 'DATE-OBS')
+    dateobs += 'T' + fits.getval(filename, 'TIME-OBS')
+    fits.setval(filename, 'DATE-OBS', value=dateobs)
 
 
 def spectoascii(infilename, outfilename):

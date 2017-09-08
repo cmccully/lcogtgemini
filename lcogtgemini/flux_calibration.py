@@ -1,154 +1,126 @@
-import lcogtgemini
 from pyraf import iraf
 import os
-from lcogtgemini.utils import boxcar_smooth, magtoflux, fluxtomag
 from lcogtgemini.file_utils import getredorblue
-from lcogtgemini import fits_utils
-from astropy.io import fits
-from lcogtgemini import combine
-from scipy import ndimage
-from scipy import interpolate
-from scipy import signal
 import numpy as np
+from astropy.io import fits, ascii
+from lcogtgemini import fits_utils
+from astropy.convolution import convolve, Gaussian1DKernel
+from lcogtgemini import fitting
 
 
-def calibrate(scifiles, extfile, observatory):
+def flux_calibrate(scifiles):
     for f in scifiles:
         redorblue = getredorblue(f)
-        iraf.unlearn(iraf.gscalibrate)
-        iraf.gscalibrate('et' + f[:-4] + '.fits',
-                         sfunc='sens' + redorblue + '.fits', fl_ext=True,
-                         fl_vardq=lcogtgemini.dodq, extinction=extfile, observatory=observatory)
 
-        if os.path.exists('cet' + f[:-4] + '.fits'):
+        # Read in the sensitivity function (in magnitudes)
+        sensitivity_hdu = fits.open('sens{redorblue}.fits'.format(redorblue=redorblue))
+        sensitivity_wavelengths = fits_utils.fitshdr_to_wave(sensitivity_hdu[0].header)
+
+        # Interpolate the sensitivity onto the science wavelengths
+        science_hdu = fits.open('xet'+ f.replace('.txt', '.fits'))
+        science_wavelenghs = fits_utils.fitshdr_to_wave(science_hdu[0].header)
+        sensitivity_correction = np.interp(science_wavelenghs, sensitivity_wavelengths, sensitivity_hdu[0].data)
+
+        # Multiply the science spectrum by the corrections
+        science_hdu['SCI'].data *= 10 ** (-0.4 * sensitivity_correction)
+        science_hdu.writeto('cxet' + f[:-4] + '.fits')
+
+        if os.path.exists('cxet' + f[:-4] + '.fits'):
             iraf.unlearn(iraf.splot)
-            iraf.splot('cet' + f.replace('.txt', '.fits') + '[sci]')  # just to check
+            iraf.splot('cxet' + f.replace('.txt', '.fits') + '[sci]')  # just to check
 
 
-def makesensfunc(scifiles, objname, base_stddir, extfile):
-    #TODO use individual standard star observations in each setting, not just red and blue
+def makesensfunc(scifiles, objname, base_stddir):
     for f in scifiles:
+        # Find the standard star file
+        standard_file = get_standard_file(objname, base_stddir)
         redorblue = getredorblue(f)
         # If this is a standard star, run standard
         # Standards will have an observation class of either progCal or partnerCal
-        # Standards will have an observation class of either progCal or partnerCal
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
-            # Figure out which directory the stardard star is in
-            stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
-
-            # iraf.gsstandard('est' + f[:-4], 'std' + redorblue,
-            #                'sens' + redorblue, starname=objname.lower(),
-            #                caldir='gmisc$lib/onedstds/'+stddir, fl_inter=True)
-
-            specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     stddir + objname + '.dat' , extfile,
-                     float(fits.getval(f[:-4] + '.fits', 'AIRMASS')),
-                     float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
+            specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
+                     standard_file, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
 
-def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
+def specsens(specfile, outfile, stdfile, exptime=None,
              stdzp=3.68e-20, thresh=8, clobber=True):
 
-    # read in the specfile and create a spectrum object
-    obs_hdu = fits.open(specfile)
-    try:
-        obs_flux = obs_hdu[2].data.copy()[0]
-        obs_hdr = obs_hdu[2].header.copy()
-    except:
-        obs_flux = obs_hdu[0].data.copy()
-        obs_hdr = obs_hdu[0].header.copy()
-    obs_hdu.close()
-    obs_wave = fits_utils.fitshdr_to_wave(obs_hdr)
+    # Read in the reference star spectrum
+    standard = ascii.read(stdfile, comment='#')
 
-    # Mask out everything below 3450 where there is no signal
-    obs_flux = obs_flux[obs_wave >= lcogtgemini.bluecut]
-    obs_wave = obs_wave[obs_wave >= lcogtgemini.bluecut]
+    # Read in the observed data
+    observed_hdu = fits.open(specfile)
+    observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
 
-    # Figure out where the chip gaps are
-    chip_edges = combine.get_chipedges(obs_flux)
+    # Read in the telluric model
+    telluric = ascii.read('telluric_model.dat')
 
-    try:
-        chip_gaps = np.ones(obs_flux.size, dtype=np.bool)
-        for edge in chip_edges:
-            chip_gaps[edge[0]: edge[1]] = False
-    except:
-        chip_gaps = np.zeros(obs_flux.size, dtype=np.bool)
 
-    template_spectrum = signal.savgol_filter(obs_flux, 21, 3)
-    noise = np.abs(obs_flux - template_spectrum)
-    noise = ndimage.filters.gaussian_filter1d(noise, 100.0)
+    # Smooth the telluric spectrum to the size of the slit
+    # I measured 5 angstroms FWHM for a 1 arcsecond slit
+    # the 2.355 converts to sigma
+    smoothing_scale = 5.0 * float(observed_hdu[0].header['MASKNAME'].split('arc')[0]) / 2.355
 
-    if chip_gaps.sum() != len(chip_gaps):
-        # Smooth the chip gaps
-        intpr = interpolate.splrep(obs_wave[np.logical_not(chip_gaps)],
-                                   obs_flux[np.logical_not(chip_gaps)],
-                                   w=1 / noise[np.logical_not(chip_gaps)], k=2,
-                                   s=20 * np.logical_not(chip_gaps).sum())
-        obs_flux[chip_gaps] = interpolate.splev(obs_wave[chip_gaps], intpr)
-    # smooth the observed spectrum
-    # read in the std file and convert from magnitudes to fnu
-    # then convert it to fwave (ergs/s/cm2/A)
-    std_wave, std_mag, _stdbnd = np.genfromtxt(stdfile).transpose()
-    std_flux = magtoflux(std_wave, std_mag, stdzp)
+    telluric['col2'] = convolve(telluric['col2'], Gaussian1DKernel(stddev=smoothing_scale))
 
-    # Get the typical bandpass of the standard star,
-    std_bandpass = np.max([50.0, np.diff(std_wave).mean()])
-    # Smooth the observed spectrum to that bandpass
-    obs_flux = boxcar_smooth(obs_wave, obs_flux, std_bandpass)
-    # read in the extinction file (leave in magnitudes)
-    ext_wave, ext_mag = np.genfromtxt(extfile).transpose()
+    telluric_correction = np.interp(observed_wavelengths, telluric['col1'], telluric['col2'])
 
-    # calculate the calibrated spectra
-    cal_flux = cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave,
-                             ext_mag, airmass, exptime)
+    # Interpolate the reference spectrum onto the observed wavelengths
+    standard_fluxes = np.interp(observed_wavelengths, standard['col1'], standard['col2'])
 
-    # Normalize the fit variables so the fit is well behaved
-    fitme_x = (obs_wave - obs_wave.min()) / (obs_wave.max() - obs_wave.min())
-    fitme_y = cal_flux / np.median(cal_flux)
-    coeffs = pfm.pffit(fitme_x, fitme_y, 5 , 7, robust=True,
-                    M=robust.norms.AndrewWave())
+    # ignored the chip gaps
+    good_pixels = observed_hdu[0].data > 0
 
-    fitted_flux = pfm.pfcalc(coeffs, fitme_x) * np.median(cal_flux)
+    # Divide the reference by the science
+    sensitivity_ratio = standard_fluxes[good_pixels] / observed_hdu[0].data[good_pixels]
 
-    cal_mag = -1.0 * fluxtomag(fitted_flux)
-    # write the spectra out
-    cal_hdr = fits_utils.sanitizeheader(obs_hdr.copy())
-    cal_hdr['OBJECT'] = 'Sensitivity function for all apertures'
-    cal_hdr['CRVAL1'] = obs_wave.min()
-    cal_hdr['CRPIX1'] = 1
-    if lcogtgemini.do_qecorr:
-        cal_hdr['QESTATE'] = True
+    # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
+    # sensitivity
+    best_fit = fit_sensitivity(observed_wavelengths[good_pixels], sensitivity_ratio,
+                               telluric_correction, 7, 21)
+    # Save the sensitivity in magnitudes
+    sensitivity = fitting.eval(best_fit, observed_wavelengths)
+    sensitivity *= best_fit['popt'][0] * telluric_correction
+
+    observed_hdu[0].data = sensitivity
+    observed_hdu.writeto(outfile)
+
+def make_sensitivity_model(n_poly, n_fourier, telluric):
+    poly_fourier_model = fitting.poly_fourier_model(n_poly, n_fourier)
+    def sensitivity_model(x, *p):
+        correction = np.ones(x.shape)
+        correction[telluric < 1] = telluric[telluric < 1] * p[0]
+        return correction * poly_fourier_model(x, *p[1:])
+    return sensitivity_model
+
+def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly, n_fourier):
+
+    function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_correction)
+    p0 = np.zeros(2 + np.zeros(1 + n_poly + 2 * n_fourier))
+    p0[0:2] = 1.0
+
+    best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
+                              function_to_fit, p0, weight_scale=2.0)
+    # Go into a while loop
+    while True:
+        # Ask if the user is not happy with the fit,
+        response = fitting.user_input('Does this fit look good? y or n:', ['y', 'n'], 'y')
+        if response == 'y':
+            break
+        # If not have the user put in new values
+        else:
+            n_poly = int(fitting.user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
+            n_fourier = int(fitting.user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
+            weight_scale = fitting.user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
+            best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
+                                       function_to_fit, p0, weight_scale)
+
+    return best_fit
+
+def get_standard_file(objname, base_stddir):
+    if os.path.exists(objname+'.std.dat'):
+        standard_file = objname+'.std.dat'
     else:
-        cal_hdr['QESTATE'] = False
-
-    fits_utils.tofits(outfile, cal_mag, hdr=cal_hdr, clobber=True)
-
-
-def cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave, ext_mag, airmass, exptime):
-    """Given an observe spectra, calculate the calibration curve for the
-       spectra.  All data is interpolated to the binning of the obs_spectra.
-       The calibrated spectra is then calculated from
-       C =  F_obs/ F_std / 10**(-0.4*A*E)/T/dW
-       where F_obs is the observed flux from the source,  F_std  is the
-       standard spectra, A is the airmass, E is the
-       extinction in mags, T is the exposure time and dW is the bandpass
-    """
-
-    # re-interpt the std_spectra over the same wavelength
-    std_flux = np.interp(obs_wave, std_wave, std_flux)
-
-    # re-interp the ext_spetra over the same wavelength
-    ext_mag = np.interp(obs_wave, ext_wave, ext_mag)
-
-    # create the calibration spectra
-    # set up the bandpass
-    bandpass = np.diff(obs_wave).mean()
-
-    # correct for extinction
-    cal_flux = obs_flux / 10 ** (-0.4 * airmass * ext_mag)
-
-    # correct for the exposure time and calculation the sensitivity curve
-    cal_flux = cal_flux / exptime / bandpass / std_flux
-
-    return cal_flux
+        standard_file = os.path.join(iraf.osfn('gmisc$lib/onedstds/'), base_stddir, objname + '.dat')
+    return standard_file
