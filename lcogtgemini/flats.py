@@ -12,9 +12,9 @@ import os
 
 
 def reduce_flat(flatfile, rawpath):
-
-    fixed_rawpath = fixpix.fixpix(flatfile, rawpath)
     binning = get_binning(flatfile, rawpath)
+    fixed_rawpath = fixpix.fixpix(flatfile, rawpath, binning)
+
     setupname = getsetupname(flatfile, calfile=True)
     # Use IRAF to get put the data in the right format and subtract the
     # bias

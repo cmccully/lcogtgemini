@@ -7,8 +7,9 @@ import os
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
-        fixed_rawpath = fixpix.fixpix(f, rawpath)
         binning = utils.get_binning(f, rawpath)
+        fixed_rawpath = fixpix.fixpix(f, rawpath, binning)
+
         iraf.unlearn(iraf.gsreduce)
         if lcogtgemini.dobias:
             bias_filename = "bias{binning}".format(binning=binning)

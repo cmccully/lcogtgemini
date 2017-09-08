@@ -53,11 +53,11 @@ def run():
     # remember not to put ".fits" on the end of filenames!
     flatfiles, arcfiles, scifiles = gettxtfiles(fs, objname)
 
-    binx, biny = get_binning(scifiles[0], rawpath).split('x')
+    binnings = set([get_binning(scifile, rawpath) for scifile in scifiles])
 
     yroi = get_y_roi(scifiles[0], rawpath)
 
-    get_bad_pixel_mask(int(binx), int(biny), yroi)
+    get_bad_pixel_mask(binnings, yroi)
 
     if lcogtgemini.dobias:
         # Make the bias frame

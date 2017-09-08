@@ -11,8 +11,9 @@ from lcogtgemini import fits_utils
 
 def scireduce(scifiles, rawpath):
     for f in scifiles:
-        fixed_rawpath = fixpix.fixpix(f, rawpath)
         binning = get_binning(f, rawpath)
+        fixed_rawpath = fixpix.fixpix(f, rawpath, binning)
+
         setupname = getsetupname(f)
         if lcogtgemini.dobias:
             bias_filename = "bias{binning}".format(binning=binning)
@@ -57,10 +58,11 @@ def extract(scifiles):
     for f in scifiles:
         iraf.unlearn(iraf.gsextract)
         # Extract the specctrum
-        iraf.gsextract('t' + f[:-4], fl_inter='yes', bfunction='legendre', fl_vardq=dodq,
+        iraf.gsextract('t' + f[:-4], fl_inter='yes', bfunction='legendre',
+                       fl_vardq=lcogtgemini.dodq,
                        border=2, bnaverage=-3, bniterate=2, blow_reject=2.0,
                        bhigh_reject=2.0, long_bsample='-100:-40,40:100',
-                       background='fit', weights='variance',
+                       background='fit', weights='variance', saturation=50000.0,
                        lsigma=3.0, usigma=3.0, tnsum=100, tstep=100, mode='h')
 
         # Trim off below the blue side cut
