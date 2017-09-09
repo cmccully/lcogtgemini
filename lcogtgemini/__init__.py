@@ -216,8 +216,35 @@ def get_binning(txt_filename, rawpath):
     return fits.getval(rawpath + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
 
 
-def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
-             stdzp=3.68e-20, thresh=8, clobber=True):
+def mask_spikes(data,wave):
+
+    spec = data
+
+    # Interpolate over the chip gaps
+    chip_edges = get_chipedges(spec)
+    chip_gaps = np.ones(spec.size, dtype=np.bool)
+    for edge in chip_edges:
+        chip_gaps[edge[0]: edge[1]] = False
+
+
+    # find gradient to reject spikes
+    gradient = np.gradient(spec)
+    abs_gradient = np.abs(gradient)
+
+    # use threshold of 99 percentile to reject spikes
+    spike_index=np.where(abs_gradient > np.percentile(abs_gradient, 99))[0]
+    not_spikes = np.ones(spec.size, dtype=np.bool)
+    not_spikes[spike_index] = False
+    # exclude chip gaps
+    not_spikes = not_spikes | chip_gaps
+
+    pdb.set_trace()
+
+    return not_spikes
+
+
+def specsens(specfile, outfile, extfile, airmass=None, exptime=None, thresh=8, clobber=True):
+
 
     # read in the specfile and create a spectrum object
     obs_hdu = fits.open(specfile)
@@ -247,31 +274,41 @@ def specsens(specfile, outfile, stdfile, extfile, airmass=None, exptime=None,
     # Mask out spikes
     not_spikes = mask_spikes(obs_flux,obs_wave)
 
-    template_spectrum = signal.savgol_filter(obs_flux, 21, 3)
-    noise = np.abs(obs_flux - template_spectrum)
+    
+
+    template_spectrum = signal.savgol_filter(spec, 21, 3)
+    noise = np.abs(spec - template_spectrum)
     noise = ndimage.filters.gaussian_filter1d(noise, 100.0)
 
-    if chip_gaps.sum() != len(chip_gaps):
-        # Smooth the chip gaps and spikes
-        intpr = interpolate.splrep(obs_wave[(np.logical_not(chip_gaps)) & (not_spikes)],
-                                   obs_flux[(np.logical_not(chip_gaps)) & (not_spikes)],
-                                   w=1 / noise[(np.logical_not(chip_gaps)) & (not_spikes)], k=3,
-                                   s=20 * (np.logical_not(chip_gaps).sum() + not_spikes.sum()))
-        obs_flux[chip_gaps] = interpolate.splev(obs_wave[chip_gaps], intpr)
-        obs_flux[np.logical_not(not_spikes)] = interpolate.splev(obs_wave[np.logical_not(not_spikes)], intpr)
+    not_telluric = telluric_mask(obs_wave)
 
-    # smooth the observed spectrum
-    # read in the std file and convert from magnitudes to fnu
-    # then convert it to fwave (ergs/s/cm2/A)
-    std_wave, std_mag, _stdbnd = np.genfromtxt(stdfile).transpose()
-    std_flux = magtoflux(std_wave, std_mag, stdzp)
+    if chip_gaps.sum() != len(chip_gaps):
+        # Smooth the chip gaps, telluric bands, and spikes
+        intpr = interpolate.splrep(obs_wave[(np.logical_not(chip_gaps)) & (not_telluric) & (not_spikes)],
+                                   obs_flux[(np.logical_not(chip_gaps)) & (not_telluric) & (not_spikes)],
+                                   w=1 / noise[(np.logical_not(chip_gaps)) & (not_telluric) & (not_spikes)], k=3,
+                                   s=20 * (((np.logical_not(chip_gaps)) & (not_telluric) & (not_spikes)).sum()))
+        obs_flux[chip_gaps] = interpolate.splev(obs_wave[chip_gaps], intpr)
+        obs_flux[np.logical_not(not_telluric)] = interpolate.splev(obs_wave[np.logical_not(not_telluric)], intpr)
+        obs_flux[np.logical_not(not_spikes)] = interpolate.splev(obs_wave[np.logical_not(not_spikes)], intpr)
+    
+    # read in the std file
+    # lambda(nm), GD71(10mW/m2/nm), LTT3218(10mW/m2/nm), GD153(10mW/m2/nm), EG274(10mW/m2/nm), LTT7987(10mW/m2/nm), Feige110(10mW/m2/nm)
+    # (10mW/m2/nm) = (ergs/s/cm2/A) !!!
+    stdfile = 'std.dat'
+    wave, GD71, LTT3218, GD153, EG274, LTT7987, Feige110 = np.genfromtxt(stdfile).transpose()
+    std_wave = wave * 10.0
+    std_flux = EG274
 
     # Get the typical bandpass of the standard star,
-    std_bandpass = np.max([50.0, np.diff(std_wave).mean()])
+    # std_bandpass = np.max([50.0, np.diff(std_wave).mean()])
+    # try binning 10 for observed spectrum
+    std_bandpass = np.max([5.0, np.diff(std_wave).mean()])
     # Smooth the observed spectrum to that bandpass
     obs_flux = boxcar_smooth(obs_wave, obs_flux, std_bandpass)
     # read in the extinction file (leave in magnitudes)
     ext_wave, ext_mag = np.genfromtxt(extfile).transpose()
+
 
     # calculate the calibrated spectra
     cal_flux = cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave,
@@ -384,7 +421,6 @@ def get_chipedges(data):
         except:
             chip_edges = []
 
-        
         pdb.set_trace()
 
         return chip_edges
@@ -423,6 +459,7 @@ def mask_chipedges(filename):
     hdu.close()
 
 
+
 def cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave, ext_mag, airmass, exptime):
     """Given an observe spectra, calculate the calibration curve for the
        spectra.  All data is interpolated to the binning of the obs_spectra.
@@ -449,7 +486,9 @@ def cal_std(obs_wave, obs_flux, std_wave, std_flux, ext_wave, ext_mag, airmass, 
     # correct for the exposure time and calculation the sensitivity curve
     cal_flux = cal_flux / exptime / bandpass / std_flux
 
+
     return cal_flux
+
 
 def boxcar_smooth(spec_wave, spec_flux, smoothwidth):
     # get the average wavelength separation for the observed spectrum
@@ -547,6 +586,7 @@ def speccombine(fs, outfile):
     f = open('scales.dat', 'w')
     f.writelines(lines)
     f.close()
+    
     # run scombine after multiplying the spectra by the best fit parameters
     if os.path.exists(outfile):
         os.remove(outfile)
@@ -580,46 +620,6 @@ def telluric_mask(waves):
     return not_telluric
 
 
-def mask_spikes(data,wave):
-
-    spec = data
-
-    # find laplacian to reject spikes
-    # laplacian = np.gradient(np.gradient(data))
-    # abs_laplacian = np.abs(laplacian)
-
-    # Interpolate over the chip gaps
-    chip_edges = get_chipedges(spec)
-    chip_gaps = np.ones(spec.size, dtype=np.bool)
-    for edge in chip_edges:
-        chip_gaps[edge[0]: edge[1]] = False
-
-    '''
-    # find gradient to reject spikes
-    gradient = np.zeros(spec.size)
-    # mask out the chip gaps
-    gradient[np.logical_not(chip_gaps)] = np.gradient(np.gradient(spec[np.logical_not(chip_gaps)]))
-    # gradient = np.gradient(spec)
-    abs_gradient = np.abs(gradient)
-    '''
-
-    # find gradient to reject spikes
-    gradient = np.gradient(spec)
-    abs_gradient = np.abs(gradient)
-
-    # use threshold of 99 percentile to reject spikes
-    spike_index=np.where(abs_gradient > np.percentile(abs_gradient, 99))[0]
-    not_spikes = np.ones(spec.size, dtype=np.bool)
-    not_spikes[spike_index] = False
-    # exclude chip gaps
-    not_spikes = not_spikes | chip_gaps
-
-    pdb.set_trace()
-
-    return not_spikes
-
-
-
 def mktelluric(filename):
     #TODO Try fitting a black body instead of interpolating.
     # if it is a standard star combined file
@@ -630,12 +630,23 @@ def mktelluric(filename):
     hdu.close()
     waves = fitshdr_to_wave(hdr)
 
+    # read in the std file
+    # lambda(nm), GD71(10mW/m2/nm), LTT3218(10mW/m2/nm), GD153(10mW/m2/nm), EG274(10mW/m2/nm), LTT7987(10mW/m2/nm), Feige110(10mW/m2/nm)
+    # (10mW/m2/nm) = (ergs/s/cm2/A) wow!!!
+    stdfile = 'std.dat'
+    wave, GD71, LTT3218, GD153, EG274, LTT7987, Feige110 = np.genfromtxt(stdfile).transpose()
+    std_wave = wave * 10.0
+    # observed spectrum is EG274, so pick EG274
+    std_spec = EG274
+
+    # re-interpt the std_spectra over the same wavelength
+    std_spec = np.interp(waves, std_wave, std_spec)
+
     # Start by interpolating over the chip gaps
     chip_edges = get_chipedges(spec)
     chip_gaps = np.ones(spec.size, dtype=np.bool)
     for edge in chip_edges:
         chip_gaps[edge[0]: edge[1]] = False
-
 
     # Mask out spikes
     not_spikes = mask_spikes(spec,waves)
@@ -660,29 +671,20 @@ def mktelluric(filename):
         spec[np.logical_not(not_spikes)] = interpolate.splev(waves[np.logical_not(not_spikes)], intpr)
 
 
+    # set telluric window values to be the same,
+    # as it should be after flux calubration
     not_telluric = telluric_mask(waves)
 
-    # Smooth the spectrum so that the spline doesn't go as crazy
-    # Use the Savitzky-Golay filter to presevere the edges of the
-    # absorption features (both atomospheric and intrinsic to the star)
-    sgspec = signal.savgol_filter(spec, 31, 3)
-    # Get the number of data points to set the smoothing criteria for the 
-    # spline
-    m = not_telluric.sum()
+    # needs to be resclared for comparison with model
+    spec *= 1e-15
+    std_spec[not_telluric] = spec[not_telluric]
 
-    intpr = interpolate.splrep(waves[not_telluric], sgspec[not_telluric],
-                               w=1 / noise[not_telluric], k=3, s=20 * m)
-
-    # Replace the telluric with the smoothed function
-    smoothedspec = interpolate.splev(waves, intpr)
-
-    smoothedspec[not_telluric] = spec[not_telluric]
 
     # Divide the original and the telluric corrected spectra to
     # get the correction factor
-    
+    correction = spec / std_spec
+
     pdb.set_trace()
-    correction = spec / smoothedspec
 
     airmass = float(hdr['AIRMASS'])
     correction = correction ** (airmass ** -0.55)
@@ -691,7 +693,6 @@ def mktelluric(filename):
     dout[0] = waves
     dout[1] = correction
     np.savetxt('telcor.dat', dout.transpose())
-
 
 
 def telluric(filename, outfile):
@@ -1127,7 +1128,7 @@ def fixpix(scifiles):
         # run fixpix
         iraf.unlearn(iraf.fixpix)
         iraf.fixpix('t' + f[:-4] + '.fits[2]', f[:-4] + '.lamask.fits', mode='h')
-
+ 
 
 def extract(scifiles):
     for f in scifiles:    
@@ -1171,7 +1172,6 @@ def reject_spikes(spec,wave):
     # Interpolate over telluric bands
     not_telluric = telluric_mask(wave)
     
-
 
     # find gradient to reject spikes
     gradient = np.gradient(data)
@@ -1249,7 +1249,8 @@ def rescale_chips(scifiles):
         hdu.close()
 
 
-def makesensfunc(scifiles, objname, base_stddir, extfile):
+
+def makesensfunc(scifiles, objname, extfile):
     #TODO use individual standard star observations in each setting, not just red and blue
     for f in scifiles:
         redorblue = getredorblue(f)
@@ -1259,14 +1260,13 @@ def makesensfunc(scifiles, objname, base_stddir, extfile):
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
             # Figure out which directory the stardard star is in
-            stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
+            # stddir = iraf.osfn('gmisc$lib/onedstds/') + base_stddir
             
             # iraf.gsstandard('est' + f[:-4], 'std' + redorblue,
             #                'sens' + redorblue, starname=objname.lower(),
             #                caldir='gmisc$lib/onedstds/'+stddir, fl_inter=True)
 
-            specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     stddir + objname + '.dat' , extfile,
+            specsens('et' + f[:-4] + '.fits', 'sens' + redorblue + '.fits', extfile,
                      float(fits.getval(f[:-4] + '.fits', 'AIRMASS')),
                      float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
@@ -1282,7 +1282,7 @@ def calibrate(scifiles, extfile, observatory):
         if os.path.exists('cet' + f[:-4] + '.fits'):
             iraf.unlearn(iraf.splot)
             iraf.splot('cet' + f.replace('.txt', '.fits') + '[sci]')  # just to check
-            
+        
          
 def updatecomheader(extractedfiles, objname):
     airmasses = []
@@ -1386,10 +1386,11 @@ def run():
     extract(scifiles)
 
     # Rescale the chips based on the science image
-    #rescale_chips(scifiles)
+    # rescale_chips(scifiles)
 
     # If standard star, make the sensitivity function
-    makesensfunc(scifiles, objname, base_stddir, extfile)
+    # makesensfunc(scifiles, objname, base_stddir, extfile)
+    makesensfunc(scifiles, objname, extfile)
     
     # Flux calibrate the spectrum
     calibrate(scifiles, extfile, observatory)
