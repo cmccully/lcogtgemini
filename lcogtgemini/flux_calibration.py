@@ -6,6 +6,7 @@ from astropy.io import fits, ascii
 from lcogtgemini import fits_utils
 from astropy.convolution import convolve, Gaussian1DKernel
 from lcogtgemini import fitting
+from lcogtgemini import utils
 
 
 def flux_calibrate(scifiles):
@@ -14,12 +15,12 @@ def flux_calibrate(scifiles):
 
         # Read in the sensitivity function (in magnitudes)
         sensitivity_hdu = fits.open('sens{redorblue}.fits'.format(redorblue=redorblue))
-        sensitivity_wavelengths = fits_utils.fitshdr_to_wave(sensitivity_hdu[0].header)
+        sensitivity_wavelengths = fits_utils.fitshdr_to_wave(sensitivity_hdu['SCI'].header)
 
         # Interpolate the sensitivity onto the science wavelengths
         science_hdu = fits.open('xet'+ f.replace('.txt', '.fits'))
-        science_wavelenghs = fits_utils.fitshdr_to_wave(science_hdu[0].header)
-        sensitivity_correction = np.interp(science_wavelenghs, sensitivity_wavelengths, sensitivity_hdu[0].data)
+        science_wavelengths = fits_utils.fitshdr_to_wave(science_hdu['SCI'].header)
+        sensitivity_correction = np.interp(science_wavelengths, sensitivity_wavelengths, sensitivity_hdu['SCI'].data)
 
         # Multiply the science spectrum by the corrections
         science_hdu['SCI'].data *= 10 ** (-0.4 * sensitivity_correction)
@@ -51,7 +52,8 @@ def specsens(specfile, outfile, stdfile, exptime=None,
 
     # Read in the observed data
     observed_hdu = fits.open(specfile)
-    observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
+    observed_data = observed_hdu[2].data[0]
+    observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[2].header)
 
     # Read in the telluric model
     telluric = ascii.read('telluric_model.dat')
@@ -64,44 +66,48 @@ def specsens(specfile, outfile, stdfile, exptime=None,
 
     telluric['col2'] = convolve(telluric['col2'], Gaussian1DKernel(stddev=smoothing_scale))
 
-    telluric_correction = np.interp(observed_wavelengths, telluric['col1'], telluric['col2'])
-
     # Interpolate the reference spectrum onto the observed wavelengths
     standard_fluxes = np.interp(observed_wavelengths, standard['col1'], standard['col2'])
 
     # ignored the chip gaps
-    good_pixels = observed_hdu[0].data > 0
+    good_pixels = observed_data > 0
 
+    telluric_correction = np.interp(observed_wavelengths[good_pixels], telluric['col1'], telluric['col2'])
     # Divide the reference by the science
-    sensitivity_ratio = standard_fluxes[good_pixels] / observed_hdu[0].data[good_pixels]
+    sensitivity_ratio = standard_fluxes[good_pixels] / observed_data[good_pixels]
 
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
-    best_fit = fit_sensitivity(observed_wavelengths[good_pixels], sensitivity_ratio,
-                               telluric_correction, 7, 21)
-    # Save the sensitivity in magnitudes
-    sensitivity = fitting.eval(best_fit, observed_wavelengths)
-    sensitivity *= best_fit['popt'][0] * telluric_correction
+    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[good_pixels], sensitivity_ratio,
+                                                  telluric_correction, 7, 21)
 
-    observed_hdu[0].data = sensitivity
-    observed_hdu.writeto(outfile)
+    # Strip out the telluric correction
+    best_fit['popt'] = best_fit['popt'][1:]
+    best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+    # Save the sensitivity in magnitudes
+    sensitivity = fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+
+    observed_hdu[2].data = utils.fluxtomag(sensitivity)
+    observed_hdu[2].writeto(outfile)
+
 
 def make_sensitivity_model(n_poly, n_fourier, telluric):
-    poly_fourier_model = fitting.poly_fourier_model(n_poly, n_fourier)
+    poly_fourier_model = fitting.polynomial_fourier_model(n_poly, n_fourier)
     def sensitivity_model(x, *p):
         correction = np.ones(x.shape)
-        correction[telluric < 1] = telluric[telluric < 1] * p[0]
-        return correction * poly_fourier_model(x, *p[1:])
+        correction[telluric < 1] = telluric[telluric < 1] ** (p[0] ** 0.55)
+        return poly_fourier_model(x, *p[1:]) / correction
     return sensitivity_model
 
-def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly, n_fourier):
+def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly, n_fourier, weight_scale=2.0):
 
     function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_correction)
-    p0 = np.zeros(2 + np.zeros(1 + n_poly + 2 * n_fourier))
-    p0[0:2] = 1.0
+    p0 = np.zeros(2 + n_poly + 2 * n_fourier)
+    p0[1] = 1.0
+    p0[0] = 1.0
 
     best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
-                              function_to_fit, p0, weight_scale=2.0)
+                              function_to_fit, p0, weight_scale=weight_scale)
     # Go into a while loop
     while True:
         # Ask if the user is not happy with the fit,
@@ -116,7 +122,8 @@ def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly,
             best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
                                        function_to_fit, p0, weight_scale)
 
-    return best_fit
+    return best_fit, n_poly, n_fourier
+
 
 def get_standard_file(objname, base_stddir):
     if os.path.exists(objname+'.std.dat'):

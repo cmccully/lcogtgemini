@@ -9,6 +9,7 @@ def sort():
     if not os.path.exists('raw'):
         iraf.mkdir('raw')
     fs = glob('*.fits')
+    fs += glob('*.dat')
     for f in fs:
         iraf.mv(f, 'raw/')
 
@@ -21,8 +22,16 @@ def sort():
         for f in sensfs:
             iraf.cp(f, 'work/')
 
-    if os.path.exists('telcor.dat'):
-        iraf.cp('telcor.dat', 'work/')
+    if os.path.exists('raw/telcor.dat'):
+        iraf.cp('raw/telcor.dat', 'work/')
+
+    if os.path.exists('raw/telluric_model.dat'):
+        iraf.cp('raw/telluric_model.dat', 'work/')
+
+    std_files = glob('raw/*.std.dat')
+    if len(std_files) != 0:
+        for f in std_files:
+            iraf.cp(f, 'work/')
 
     if os.path.exists('raw/bias.fits'):
         iraf.cp('raw/bias.fits', 'work/')

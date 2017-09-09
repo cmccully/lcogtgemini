@@ -17,10 +17,12 @@ def magtoflux(wave, mag, zp):
 def fluxtomag(flux):
     return -2.5 * np.log10(flux)
 
+
 def get_y_roi(txtfile, rawpath):
     images = file_utils.get_images_from_txt_file(txtfile)
     hdu = fits.open(os.path.join(rawpath, images[0]))
     return [int(i) for i in hdu[1].header['DETSEC'][1:-1].split(',')[1].split(':')]
+
 
 def boxcar_smooth(spec_wave, spec_flux, smoothwidth):
     # get the average wavelength separation for the observed spectrum

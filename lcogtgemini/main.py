@@ -101,7 +101,7 @@ def run():
     extractedfiles = glob('cxet*.fits')
 
     # If a standard star, make the telluric correction
-    obsclass = fits.getval(objname + '.fits', 'OBSCLASS')
+    obsclass = fits.getval(extractedfiles[0], 'OBSCLASS')
     if obsclass == 'progCal' or obsclass == 'partnerCal':
         speccombine(extractedfiles, objname+'.notel.fits')
         updatecomheader(extractedfiles, objname + '.notel.fits')

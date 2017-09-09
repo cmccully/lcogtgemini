@@ -37,7 +37,7 @@ def irls(x, data, errors, model_function, initial_parameter_guess, tol=1e-6, wei
 
     y_scale =  np.median(data)
     y = data / y_scale
-    scatter = errors / np.median(data)
+    scatter = errors / y_scale
 
     # Do an initial fit of the model
     # Use 1 / sigma^2 as weights
@@ -84,13 +84,13 @@ def eval_fit(fit_dict, x):
 def polynomial_fourier_model(n_poly, n_fourier):
     def model_to_optimize(x, *p):
         y = p[0]
-        for i in range(n_poly):
-            y += p[i + 1] * x ** i
+        for i in range(1, n_poly + 1):
+            y += p[i] * x ** i
         # Note this assumes that x is roughly normalized between 0 and 1
         omega_t = 2.0 * np.pi * x
-        for i in range(n_fourier):
-            y += p[2 * i + 1 + n_poly] * np.sin(i * omega_t)
-            y += p[2 * i + 2 + n_poly] * np.cos(i * omega_t)
+        for i in range(1, n_fourier + 1):
+            y += p[2 * i - 1 + n_poly] * np.sin(i * omega_t)
+            y += p[2 * i + n_poly] * np.cos(i * omega_t)
         return y
     return model_to_optimize
 
