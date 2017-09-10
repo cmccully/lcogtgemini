@@ -104,7 +104,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
                     n_fourier, readnoise, weight_scale=2.0):
 
     function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux)
-    p0 = np.zeros(2 + n_poly + 2 * n_fourier)
+    p0 = np.zeros(6 + n_poly + 2 * n_fourier)
     p0[0] = 0.0
     p0[1] = 1.0
     p0[2] = 1.0
