@@ -152,10 +152,17 @@ def user_input(prompt, choices=None, default=None, is_number=False):
 
 
 def plot_best_fit(x, y, best_fit):
-    pyplot.ion()
-    pyplot.clf()
-    pyplot.plot(x, y, 'b')
-    pyplot.plot(x, eval_fit(best_fit, x), 'r')
+    fig = pyplot.gcf()
+    fig.clf()
+    axes = fig.get_axes()
+    if not axes:
+        pyplot.subplot(211)
+        pyplot.subplot(212)
+
+    axes[0].plot(x, y, 'b')
+    y_model = eval_fit(best_fit, x)
+    axes[0].plot(x, y_model, 'r')
+    axes[1].plot(x, y - y_model, 'o')
 
 
 def fitxcor(warr, farr, telwarr, telfarr):

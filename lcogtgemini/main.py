@@ -20,6 +20,8 @@ import os
 from astropy.io import fits
 from pyraf import iraf
 from glob import glob
+from matplotlib import pyplot
+pyplot.ion()
 
 
 def run():

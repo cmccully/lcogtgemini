@@ -66,23 +66,17 @@ def specsens(specfile, outfile, stdfile, exptime=None,
 
     telluric['col2'] = convolve(telluric['col2'], Gaussian1DKernel(stddev=smoothing_scale))
 
-    # Interpolate the reference spectrum onto the observed wavelengths
-    standard_fluxes = np.interp(observed_wavelengths, standard['col1'], standard['col2'])
-
     # ignored the chip gaps
     good_pixels = observed_data > 0
 
-    telluric_correction = np.interp(observed_wavelengths[good_pixels], telluric['col1'], telluric['col2'])
-    # Divide the reference by the science
-    sensitivity_ratio = standard_fluxes[good_pixels] / observed_data[good_pixels]
-
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
-    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[good_pixels], sensitivity_ratio,
-                                                  telluric_correction, 7, 21)
+    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[good_pixels], observed_data[good_pixels],
+                                                  telluric['col1'], telluric['col2'], standard['col1'], standard['col2'],
+                                                  7, 21, float(observed_hdu[2].header['RDNOISE']))
 
     # Strip out the telluric correction
-    best_fit['popt'] = best_fit['popt'][1:]
+    best_fit['popt'] = best_fit['popt'][5:]
     best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
     # Save the sensitivity in magnitudes
     sensitivity = fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
@@ -91,23 +85,36 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     observed_hdu[2].writeto(outfile)
 
 
-def make_sensitivity_model(n_poly, n_fourier, telluric):
+def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux):
     poly_fourier_model = fitting.polynomial_fourier_model(n_poly, n_fourier)
     def sensitivity_model(x, *p):
-        correction = np.ones(x.shape)
-        correction[telluric < 1] = telluric[telluric < 1] ** (p[0] ** 0.55)
-        return poly_fourier_model(x, *p[1:]) / correction
+        # p 0, 1, 2 are for telluric fitting.
+        # 0 and 1 linear wavelength shift and scale for telluric
+        # 2 is power of telluric correction
+        telluric_model = np.interp(x, p[1] * (std_waves - p[0]), std_flux)
+        telluric_model **= (p[2] ** 0.55)
+
+        # p 3, 4 are linear wavelength shift and scale for the standard model
+        std_model = np.interp(x, p[4] * (std_waves - p[3]), std_flux)
+
+        return poly_fourier_model(x, *p[5:]) * telluric_model * std_model
     return sensitivity_model
 
-def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly, n_fourier, weight_scale=2.0):
+def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_waves, std_flux, n_poly,
+                    n_fourier, readnoise, weight_scale=2.0):
 
-    function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_correction)
+    function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux)
     p0 = np.zeros(2 + n_poly + 2 * n_fourier)
+    p0[0] = 0.0
     p0[1] = 1.0
-    p0[0] = 1.0
+    p0[2] = 1.0
+    p0[3] = 0.0
+    p0[4] = 1.0
+    p0[5] = 1.0
 
-    best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
-                              function_to_fit, p0, weight_scale=weight_scale)
+    errors = np.sqrt((np.abs(data) + readnoise) ** 2.0)
+
+    best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale=weight_scale)
     # Go into a while loop
     while True:
         # Ask if the user is not happy with the fit,
@@ -119,8 +126,7 @@ def fit_sensitivity(wavelengths, sensitivity_ratio, telluric_correction, n_poly,
             n_poly = int(fitting.user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
             n_fourier = int(fitting.user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
             weight_scale = fitting.user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
-            best_fit = fitting.run_fit(wavelengths, sensitivity_ratio, 0.1 * np.abs(sensitivity_ratio),
-                                       function_to_fit, p0, weight_scale)
+            best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale=weight_scale)
 
     return best_fit, n_poly, n_fourier
 

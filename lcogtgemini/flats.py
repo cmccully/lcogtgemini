@@ -59,7 +59,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
 
         data = np.median(flat_hdu['SCI'].data, axis=0)
         wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
-        errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE'])**2.0)
+        errors = np.sqrt((np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE']))**2.0)
 
         good_data = data != 0.0
 
