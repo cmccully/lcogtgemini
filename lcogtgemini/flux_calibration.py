@@ -69,6 +69,9 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # ignored the chip gaps
     good_pixels = observed_data > 0
 
+    standard_scale = np.median(standard['col2'])
+
+    standard['col2'] /= standard_scale
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
     best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[good_pixels], observed_data[good_pixels],
@@ -79,7 +82,7 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     best_fit['popt'] = best_fit['popt'][5:]
     best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
     # Save the sensitivity in magnitudes
-    sensitivity = fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+    sensitivity = standard_scale * fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
 
     observed_hdu[2].data = utils.fluxtomag(sensitivity)
     observed_hdu[2].writeto(outfile)

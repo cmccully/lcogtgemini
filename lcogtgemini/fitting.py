@@ -1,5 +1,4 @@
 import numpy as np
-import astropy.modeling
 from scipy import optimize
 from statsmodels import robust
 from lcogtgemini.utils import mad
@@ -155,9 +154,10 @@ def plot_best_fit(x, y, best_fit):
     fig = pyplot.gcf()
     fig.clf()
     axes = fig.get_axes()
-    if not axes:
+    if len(axes) == 0:
         pyplot.subplot(211)
         pyplot.subplot(212)
+        axes = fig.get_axes()
 
     axes[0].plot(x, y, 'b')
     y_model = eval_fit(best_fit, x)
