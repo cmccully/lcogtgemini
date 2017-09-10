@@ -69,7 +69,7 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # ignored the chip gaps
     good_pixels = observed_data > 0
 
-    standard_scale = np.median(standard['col2'])
+    standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))
 
     standard['col2'] /= standard_scale
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
@@ -88,17 +88,20 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     observed_hdu[2].writeto(outfile)
 
 
-def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux):
+def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux,
+                           wavelength_min, wavelength_range):
     poly_fourier_model = fitting.polynomial_fourier_model(n_poly, n_fourier)
+    normalized_telluric_wavelengths = (telluric_waves - wavelength_min) / wavelength_range
+    normalized_standard_wavelengths = (std_waves - wavelength_min) / wavelength_range
     def sensitivity_model(x, *p):
         # p 0, 1, 2 are for telluric fitting.
         # 0 and 1 linear wavelength shift and scale for telluric
         # 2 is power of telluric correction
-        telluric_model = np.interp(x, p[1] * (std_waves - p[0]), std_flux)
+        telluric_model = np.interp(x, p[1] * (normalized_telluric_wavelengths - p[0]), telluric_correction)
         telluric_model **= (p[2] ** 0.55)
 
         # p 3, 4 are linear wavelength shift and scale for the standard model
-        std_model = np.interp(x, p[4] * (std_waves - p[3]), std_flux)
+        std_model = np.interp(x, p[4] * (normalized_standard_wavelengths - p[3]), std_flux)
 
         return poly_fourier_model(x, *p[5:]) * telluric_model * std_model
     return sensitivity_model
@@ -106,7 +109,9 @@ def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correctio
 def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_waves, std_flux, n_poly,
                     n_fourier, readnoise, weight_scale=2.0):
 
-    function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux)
+    _, wavelength_min, wavelength_range = fitting.normalize_fitting_coordinate(wavelengths)
+    function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux,
+                                             wavelength_min, wavelength_range)
     p0 = np.zeros(6 + n_poly + 2 * n_fourier)
     p0[0] = 0.0
     p0[1] = 1.0
