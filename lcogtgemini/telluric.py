@@ -45,7 +45,7 @@ def telluric_correct(filename, outfile):
 
 def mktelluric(filename, objname, base_stddir):
     # Read in the standard file
-    standard = flux_calibration.get_standard_file(objname, base_stddir)
+    standard = ascii.read(flux_calibration.get_standard_file(objname, base_stddir))
     observed_hdu = fits.open(filename)
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
 
@@ -61,7 +61,7 @@ def mktelluric(filename, objname, base_stddir):
     # Divide the observed by the standard
     # Fill the rest with ones
     correction = np.ones(observed_wavelengths.shape)
-    correction[in_telluric] = observed_hdu[0].data[in_telluric] / standard_flux
+    correction[in_telluric] = observed_hdu[0].data[in_telluric] / standard_flux[in_telluric]
 
     # Raise the whole telluric correction to the airmass ** -0.55 power
     # See matheson's paper. This normalizes things to airmass 1

@@ -24,6 +24,7 @@ def flux_calibrate(scifiles):
 
         # Multiply the science spectrum by the corrections
         science_hdu['SCI'].data *= 10 ** (-0.4 * sensitivity_correction)
+        science_hdu['SCI'].data *= float(sensitivity_hdu['SCI'].header['EXPTIME']) / float(science_hdu['SCI'].header['EXPTIME'])
         science_hdu.writeto('cxet' + f[:-4] + '.fits')
 
         if os.path.exists('cxet' + f[:-4] + '.fits'):
@@ -69,20 +70,25 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # ignored the chip gaps
     good_pixels = observed_data > 0
 
+    # Clip the edges of the detector where craziness happen.
+    good_pixels[:20] = False
+    good_pixels[-20:] = False
+
     standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))
 
     standard['col2'] /= standard_scale
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
-    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[good_pixels], observed_data[good_pixels],
+    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths, observed_data,
                                                   telluric['col1'], telluric['col2'], standard['col1'], standard['col2'],
-                                                  7, 21, float(observed_hdu[2].header['RDNOISE']))
+                                                  11, 0, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels)
 
     # Strip out the telluric correction
-    best_fit['popt'] = best_fit['popt'][5:]
+    best_fit['popt'] = best_fit['popt'][6:]
     best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+    import pdb; pdb.set_trace()
     # Save the sensitivity in magnitudes
-    sensitivity = standard_scale * fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+    sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) / float(observed_hdu[0].header['EXPTIME'])
 
     observed_hdu[2].data = utils.fluxtomag(sensitivity)
     observed_hdu[2].writeto(outfile)
@@ -96,33 +102,43 @@ def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correctio
     def sensitivity_model(x, *p):
         # p 0, 1, 2 are for telluric fitting.
         # 0 and 1 linear wavelength shift and scale for telluric
-        # 2 is power of telluric correction
-        telluric_model = np.interp(x, p[1] * (normalized_telluric_wavelengths - p[0]), telluric_correction)
-        telluric_model **= (p[2] ** 0.55)
+        # 2 is power of telluric correction for the O2 A and B bands
+        # 3 is the power of the telluric correction for the water bands (the rest of the telluric features)
+        shifted_telluric_wavelengths =  p[1] * (normalized_telluric_wavelengths - p[0])
+        telluric_model = np.interp(x, shifted_telluric_wavelengths, telluric_correction,
+                                   left=1.0, right=1.0)
 
+        in_A = np.logical_and(x >= (6821. - wavelength_min) / wavelength_range, x <= (7094. - wavelength_min) / wavelength_range)
+        in_B = np.logical_and(x <= (7731. - wavelength_min) / wavelength_range, x >= (7562. - wavelength_min) / wavelength_range)
+        in_AB = np.logical_or(in_A, in_B)
+
+        telluric_model[in_AB] **= (p[2] ** 0.55)
+        telluric_model[~in_AB] **= (p[3] ** 0.55)
         # p 3, 4 are linear wavelength shift and scale for the standard model
-        std_model = np.interp(x, p[4] * (normalized_standard_wavelengths - p[3]), std_flux)
-
-        return poly_fourier_model(x, *p[5:]) * telluric_model * std_model
+        std_model = np.interp(x, p[5] * (normalized_standard_wavelengths - p[4]), std_flux)
+        return poly_fourier_model(x, *p[6:]) * telluric_model * std_model
     return sensitivity_model
 
+
 def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_waves, std_flux, n_poly,
-                    n_fourier, readnoise, weight_scale=2.0):
+                    n_fourier, readnoise, good_pixels, weight_scale=2.0):
 
     _, wavelength_min, wavelength_range = fitting.normalize_fitting_coordinate(wavelengths)
     function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux,
                                              wavelength_min, wavelength_range)
-    p0 = np.zeros(6 + n_poly + 2 * n_fourier)
-    p0[0] = 0.0
-    p0[1] = 1.0
-    p0[2] = 1.0
-    p0[3] = 0.0
-    p0[4] = 1.0
-    p0[5] = 1.0
-
-    errors = np.sqrt((np.abs(data) + readnoise) ** 2.0)
-
-    best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale=weight_scale)
+    def init_p0(n_poly, n_fourier):
+        p0 = np.zeros(7 + n_poly + 2 * n_fourier)
+        p0[0] = 0.0
+        p0[1] = 1.0
+        p0[2] = 1.0
+        p0[3] = 1.0
+        p0[4] = 0.0
+        p0[5] = 1.0
+        p0[6] = 1.0
+        return p0
+    p0 = init_p0(n_poly, n_fourier)
+    errors = np.sqrt(np.abs(data) + readnoise ** 2.0)
+    best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)
     # Go into a while loop
     while True:
         # Ask if the user is not happy with the fit,
@@ -131,10 +147,11 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
             break
         # If not have the user put in new values
         else:
+            p0 = init_p0(n_poly, n_fourier)
             n_poly = int(fitting.user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
             n_fourier = int(fitting.user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
             weight_scale = fitting.user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
-            best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale=weight_scale)
+            best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)
 
     return best_fit, n_poly, n_fourier
 

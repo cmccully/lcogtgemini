@@ -57,17 +57,17 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         setupname = getsetupname(flatfile, calfile=True)
         flat_hdu = fits.open('t'+ flatfile[:-4] + '.mos.fits')
 
-        data = np.median(flat_hdu['SCI'].data, axis=0)
+        data = flat_hdu['SCI'].data[flat_hdu['SCI'].data.shape[0] // 2]
         wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
-        errors = np.sqrt((np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE']))**2.0)
+        errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE'])**2.0)
 
         good_data = data != 0.0
+        # Clip the ends because of craziness that happens at the edges
+        good_data[:20] = False
+        good_data[-20:] = False
 
-        data = data[good_data]
-        wavelengths = wavelengths[good_data]
-        errors = errors[good_data]
 
-        best_fit = fitting.fit_polynomial_fourier_model(wavelengths, data, errors, 7, 21)
+        best_fit = fitting.fit_polynomial_fourier_model(wavelengths, data, errors, 11, 31, good_data)
 
         # Open the unmoasiced (and optionally qe corrected flat file)
         if lcogtgemini.do_qecorr:

@@ -27,21 +27,20 @@ def normalize_fitting_coordinate(x):
 
 
 # Iterative reweighting linear least squares
-def irls(x, data, errors, model_function, initial_parameter_guess, tol=1e-6, weight_function=robust.norms.AndrewWave,
-         weight_scale=2.0, maxiter=10):
+def irls(x, data, errors, model_function, initial_parameter_guess, good_pixels,
+         tol=1e-6, weight_function=robust.norms.AndrewWave, weight_scale=2.0, maxiter=10):
     weights_calculator = weight_function(weight_scale)
 
     #Normalize to make fitting easier
     normalized_x, xmin, x_range = normalize_fitting_coordinate(x)
 
-    y_scale =  np.median(data)
-    y = data / y_scale
-    scatter = errors / y_scale
+    y_scale =  np.median(data[good_pixels])
+    y = data[good_pixels] / y_scale
+    scatter = errors[good_pixels] / y_scale
 
     # Do an initial fit of the model
     # Use 1 / sigma^2 as weights
-    best_parameters = optimize.curve_fit(model_function, normalized_x, y, p0=initial_parameter_guess, sigma=scatter)[0]
-
+    best_parameters = optimize.curve_fit(model_function, normalized_x[good_pixels], y, p0=initial_parameter_guess, sigma=scatter)[0]
 
     notconverged=True
     last_chi2 = np.inf
@@ -49,7 +48,7 @@ def irls(x, data, errors, model_function, initial_parameter_guess, tol=1e-6, wei
     # Until converged
     while notconverged:
         # Update the weights
-        residuals = y - model_function(normalized_x, *best_parameters)
+        residuals = y - model_function(normalized_x[good_pixels], *best_parameters)
         # Save the chi^2 to check for convergence
         chi2 = ((residuals / scatter) ** 2.0).sum()
 
@@ -60,7 +59,7 @@ def irls(x, data, errors, model_function, initial_parameter_guess, tol=1e-6, wei
         fit_errors[weights > 0] = weights[weights > 0] ** -2.0
         fit_errors[weights == 0] = np.inf
         # refit
-        best_parameters = optimize.curve_fit(model_function, normalized_x, y,
+        best_parameters = optimize.curve_fit(model_function, normalized_x[good_pixels], y,
                                              p0=best_parameters, sigma=fit_errors)[0]
 
         # converged when the change in the chi^2 (or l2 norm or whatever) is
@@ -94,27 +93,27 @@ def polynomial_fourier_model(n_poly, n_fourier):
     return model_to_optimize
 
 
-def run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale):
+def run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale, good_pixels):
     function_to_fit = polynomial_fourier_model(n_poly, n_fourier)
     p0 = np.zeros(1 + n_poly + 2 * n_fourier)
     p0[0] = 1.0
 
-    best_fit = run_fit(x, y, errors, function_to_fit, p0, weight_scale)
+    best_fit = run_fit(x, y, errors, function_to_fit, p0, weight_scale, good_pixels)
 
     return best_fit
 
-def run_fit(x, y, errors, function_to_fit, p0, weight_scale):
+def run_fit(x, y, errors, function_to_fit, p0, weight_scale, good_pixels):
     # Run IRLS on the data given the input parameters
-    best_fit = irls(x, y, errors, function_to_fit, p0, weight_scale=weight_scale)
+    best_fit = irls(x, y, errors, function_to_fit, p0, good_pixels, weight_scale=weight_scale)
 
     # Plot the best fit
-    plot_best_fit(x, y, best_fit)
+    plot_best_fit(x, y, best_fit, good_pixels),
 
     return best_fit
 
-def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, weight_scale=2.0):
+def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, good_pixels, weight_scale=2.0):
 
-    best_fit = run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale)
+    best_fit = run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale, good_pixels)
     # Go into a while loop
     while True:
         # Ask if the user is not happy with the fit,
@@ -126,7 +125,7 @@ def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, weight_scale=2
             n_poly = int(user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
             n_fourier = int(user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
             weight_scale = user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
-            best_fit = run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale)
+            best_fit = run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale, good_pixels)
 
     return best_fit
 
@@ -150,19 +149,19 @@ def user_input(prompt, choices=None, default=None, is_number=False):
     return response
 
 
-def plot_best_fit(x, y, best_fit):
+def plot_best_fit(x, y, best_fit, good_pixels):
     fig = pyplot.gcf()
     fig.clf()
     axes = fig.get_axes()
     if len(axes) == 0:
-        pyplot.subplot(211)
-        pyplot.subplot(212)
+        ax1 = pyplot.subplot(211)
+        pyplot.subplot(212, sharex=ax1)
         axes = fig.get_axes()
 
     axes[0].plot(x, y, 'b')
     y_model = eval_fit(best_fit, x)
     axes[0].plot(x, y_model, 'r')
-    axes[1].plot(x, y - y_model, 'o')
+    axes[1].plot(x[good_pixels], y[good_pixels] - y_model[good_pixels], 'o', markersize=1.0)
 
 
 def fitxcor(warr, farr, telwarr, telfarr):

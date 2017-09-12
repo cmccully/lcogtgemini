@@ -5,9 +5,8 @@ from lcogtgemini import fits_utils
 
 from pyraf import iraf
 
-def reject_bad_pixels(hdu, threshold=20.0):
+def find_bad_pixels(data, threshold=20.0):
     # Take the abs next pixel diff
-    data = hdu['SCI'].data[0]
     absdiff = np.abs(data[1:] - data[:-1])
     # divide by square root of 2
     scatter = absdiff / np.sqrt(2.0)
@@ -20,23 +19,22 @@ def reject_bad_pixels(hdu, threshold=20.0):
     bad_pixels = np.zeros(data.shape, dtype=bool)
     bad_pixels[0:-1] = deviant_pixels
     bad_pixels[1:] = np.logical_or(bad_pixels[1:], deviant_pixels)
-
-    hdu['SCI'].data[0][bad_pixels] = 0.0
-    return hdu
+    return bad_pixels
 
 
 def speccombine(fs, outfile):
-    hdu = fits.open(fs[0])
-    first_hdu = reject_bad_pixels(hdu)
+    first_hdu = fits.open(fs[0])
+    bad_pixels = find_bad_pixels(first_hdu['SCI'].data)
+    first_hdu['SCI'].data[bad_pixels] = 0.0
     first_wavelengths = fits_utils.fitshdr_to_wave(first_hdu['SCI'].header)
     scales = []
     for f in fs:
         hdu = fits.open(f)
         # Reject outliers
-        hdu = reject_bad_pixels(hdu)
-        wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
+        bad_pixels = find_bad_pixels(hdu['SCI'].data[0])
+        wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)[~bad_pixels]
         # Take the median of the ratio of each spectrum to the first to get the rescaling
-        data = hdu['SCI'].data[0]
+        data = hdu['SCI'].data[0][~bad_pixels]
         fluxes = np.interp(first_wavelengths, wavelengths, data, left=0.0, right=0.0)
         good_pixels = np.logical_and(first_hdu['SCI'].data[0] != 0.0, fluxes != 0.0)
         scales.append(np.median(first_hdu['SCI'].data[0][good_pixels] / fluxes[good_pixels]))
