@@ -4,6 +4,7 @@ from lcogtgemini.file_utils import getredorblue
 import numpy as np
 from astropy.io import fits, ascii
 from lcogtgemini import fits_utils
+from lcogtgemini import combine
 from astropy.convolution import convolve, Gaussian1DKernel
 from lcogtgemini import fitting
 from lcogtgemini import utils
@@ -24,7 +25,7 @@ def flux_calibrate(scifiles):
 
         # Multiply the science spectrum by the corrections
         science_hdu['SCI'].data *= 10 ** (-0.4 * sensitivity_correction)
-        science_hdu['SCI'].data *= float(sensitivity_hdu['SCI'].header['EXPTIME']) / float(science_hdu['SCI'].header['EXPTIME'])
+        science_hdu['SCI'].data *= float(science_hdu[0].header['EXPTIME'])
         science_hdu.writeto('cxet' + f[:-4] + '.fits')
 
         if os.path.exists('cxet' + f[:-4] + '.fits'):
@@ -74,6 +75,9 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     good_pixels[:20] = False
     good_pixels[-20:] = False
 
+    bad_pixels = combine.find_bad_pixels(observed_data)
+    good_pixels = np.logical_and(good_pixels, ~bad_pixels)
+
     standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))
 
     standard['col2'] /= standard_scale
@@ -86,9 +90,9 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # Strip out the telluric correction
     best_fit['popt'] = best_fit['popt'][6:]
     best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
-    import pdb; pdb.set_trace()
+
     # Save the sensitivity in magnitudes
-    sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) / float(observed_hdu[0].header['EXPTIME'])
+    sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
 
     observed_hdu[2].data = utils.fluxtomag(sensitivity)
     observed_hdu[2].writeto(outfile)
@@ -147,10 +151,12 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
             break
         # If not have the user put in new values
         else:
-            p0 = init_p0(n_poly, n_fourier)
             n_poly = int(fitting.user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
             n_fourier = int(fitting.user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
             weight_scale = fitting.user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
+            p0 = init_p0(n_poly, n_fourier)
+            function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves,
+                                                     std_flux, wavelength_min, wavelength_range)
             best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)
 
     return best_fit, n_poly, n_fourier

@@ -7,40 +7,46 @@ import os
 from astropy.io import ascii
 
 
+# Taken from the Berkley telluric correction
+#telluricWaves = [(2000., 3190.), (3216., 3420.), (5500., 6050.), (6250., 6360.),
+#                 (6450., 6530.), (6840., 7410.), (7550., 8410.), (8800., 9800.)]
 # Taken from Moehler et al 2014 (on eg274)
-telluricWaves = [(5855., 5992.), (6261., 6349.), (6438., 6600.), (6821., 7094.),
-                 (7127., 7434.), (7562., 7731.), (7801., 8613.), (8798., 10338.)]
+#telluricWaves = [(5855., 5992.), (6261., 6349.), (6438., 6600.), (6821., 7094.),
+#                 (7127., 7434.), (7562., 7731.), (7801., 8613.), (8798., 10338.)]
 
-def telluric_correct(filename, outfile):
+telluricWaves = [(5500., 6050.), (6250., 6360.), (6438., 6600.), (6821., 7434.), (7550., 8613.), (8798., 10338.)]
 
-    # Get the standard to use for telluric correction
-    stdfile = 'telcor.dat'
+def telluric_correct(input_files):
+    output_files = []
+    for filename in input_files:
 
-    hdu = fits.open(filename)
-    spec = hdu[0].data.copy()
-    hdr = hdu[0].header.copy()
-    hdu.close()
-    waves = fits_utils.fitshdr_to_wave(hdr)
+        # Get the standard to use for telluric correction
+        stdfile = 'telcor.dat'
 
-    telwave, telspec = np.genfromtxt(stdfile).transpose()
-    # Cross-correlate the standard star and the sci spectra
-    # to find wavelength shift of standard star.
-    w = np.logical_and(waves > 7550., waves < 8410.)
-    tw = np.logical_and(telwave > 7550., telwave < 8410.)
-    p = fitting.fitxcor(waves[w], spec[w], telwave[tw], telspec[tw])
-    # shift and stretch standard star spectrum to match science
-    # spectrum.
-    telcorr = np.interp(waves, p[0] * telwave + p[1], telspec)
+        hdu = fits.open(filename)
+        waves = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
 
-    # Correct for airmass
-    airmass = float(hdr['AIRMASS'])
-    telcorr = telcorr ** (airmass ** 0.55)
+        telwave, telspec = np.genfromtxt(stdfile).transpose()
+        # Cross-correlate the standard star and the sci spectra
+        # to find wavelength shift of standard star.
+        w = np.logical_and(waves > 7550., waves < 8410.)
+        tw = np.logical_and(telwave > 7550., telwave < 8410.)
+        p = fitting.fitxcor(waves[w], hdu['SCI'].data[0][w], telwave[tw], telspec[tw])
+        # shift and stretch standard star spectrum to match science
+        # spectrum.
+        telcorr = np.interp(waves, p[0] * telwave + p[1], telspec)
 
-    # Divide science spectrum by transformed standard star sub-spectrum
-    correct_spec = spec / telcorr
+        # Correct for airmass
+        airmass = float(hdu[0].header['AIRMASS'])
+        telcorr = telcorr ** (airmass ** 0.55)
 
-    # Copy telluric-corrected data to new file.
-    fits_utils.tofits(outfile, correct_spec, hdr=hdr)
+        # Divide science spectrum by transformed standard star sub-spectrum
+        hdu['SCI'].data[0] /= telcorr
+        outfile = 't'+filename
+        output_files.append(outfile)
+        # Copy telluric-corrected data to new file.
+        hdu.writeto(outfile)
+    return output_files
 
 
 def mktelluric(filename, objname, base_stddir):
@@ -61,6 +67,9 @@ def mktelluric(filename, objname, base_stddir):
     # Divide the observed by the standard
     # Fill the rest with ones
     correction = np.ones(observed_wavelengths.shape)
+
+    in_telluric = np.logical_and(observed_hdu[0].data > 0, in_telluric)
+
     correction[in_telluric] = observed_hdu[0].data[in_telluric] / standard_flux[in_telluric]
 
     # Raise the whole telluric correction to the airmass ** -0.55 power

@@ -125,6 +125,7 @@ def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, good_pixels, w
             n_poly = int(user_input('Order of polynomial to fit:', [str(i) for i in range(100)], n_poly))
             n_fourier = int(user_input('Order of Fourier terms to fit:', [str(i) for i in range(100)], n_fourier))
             weight_scale = user_input('Scale for outlier rejection:', default=weight_scale, is_number=True)
+
             best_fit = run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale, good_pixels)
 
     return best_fit

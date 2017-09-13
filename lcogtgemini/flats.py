@@ -8,7 +8,7 @@ import numpy as np
 from pyraf import iraf
 from astropy.io import fits
 import os
-
+from lcogtgemini import combine
 
 
 def reduce_flat(flatfile, rawpath):
@@ -65,7 +65,8 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         # Clip the ends because of craziness that happens at the edges
         good_data[:20] = False
         good_data[-20:] = False
-
+        bad_pixels = combine.find_bad_pixels(data)
+        good_data = np.logical_and(good_data, ~bad_pixels)
 
         best_fit = fitting.fit_polynomial_fourier_model(wavelengths, data, errors, 11, 31, good_data)
 

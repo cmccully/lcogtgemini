@@ -5,7 +5,7 @@ from lcogtgemini import fits_utils
 
 from pyraf import iraf
 
-def find_bad_pixels(data, threshold=20.0):
+def find_bad_pixels(data, threshold=10.0):
     # Take the abs next pixel diff
     absdiff = np.abs(data[1:] - data[:-1])
     # divide by square root of 2
@@ -23,33 +23,77 @@ def find_bad_pixels(data, threshold=20.0):
 
 
 def speccombine(fs, outfile):
-    first_hdu = fits.open(fs[0])
-    bad_pixels = find_bad_pixels(first_hdu['SCI'].data)
-    first_hdu['SCI'].data[bad_pixels] = 0.0
-    first_wavelengths = fits_utils.fitshdr_to_wave(first_hdu['SCI'].header)
     scales = []
+    wavelengths = []
     for f in fs:
         hdu = fits.open(f)
-        # Reject outliers
-        bad_pixels = find_bad_pixels(hdu['SCI'].data[0])
-        wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)[~bad_pixels]
-        # Take the median of the ratio of each spectrum to the first to get the rescaling
-        data = hdu['SCI'].data[0][~bad_pixels]
-        fluxes = np.interp(first_wavelengths, wavelengths, data, left=0.0, right=0.0)
-        good_pixels = np.logical_and(first_hdu['SCI'].data[0] != 0.0, fluxes != 0.0)
-        scales.append(np.median(first_hdu['SCI'].data[0][good_pixels] / fluxes[good_pixels]))
-        hdu['SCI'].data[0][hdu['SCI'].data[0] == 0.0] = -10000.0
-        hdu.writeto('b' + f)
+        wavelengths.append(fits_utils.fitshdr_to_wave(hdu['SCI'].header))
 
-    spectra_to_combine = ['b' + f + '[SCI]' for f in fs]
-    # write the best fit parameters into the headers of the files
-    # Dump the list of spectra into a string that iraf can handle
-    iraf_filelist = str(spectra_to_combine)[1:-1].replace("'", '')
+    # Get the overlaps
+    overlap_min_w = 0.0
+    overlap_max_w = 100000.0
+    min_w = 1000000.0
+    max_w = 0.0
+    wavelength_step = 1000.0
+    for wavelength in wavelengths:
+        overlap_min_w = max([overlap_min_w, np.min(wavelength)])
+        overlap_max_w = min([overlap_max_w, np.max(wavelength)])
+        min_w = min([min_w, np.min(wavelength)])
+        max_w = max([max_w, np.max(wavelength)])
+        wavelength_step = min([wavelength_step, wavelength[1] - wavelength[0]])
+
+    min_w = np.max([min_w, lcogtgemini.bluecut])
+    first_hdu = fits.open(fs[0])
+    first_wavelengths = fits_utils.fitshdr_to_wave(first_hdu['SCI'].header)
+    bad_pixels = find_bad_pixels(first_hdu['SCI'].data[0])
+    first_hdu['SCI'].data[0][bad_pixels] = 0.0
+
+    wavelength_grid = np.arange(min_w, max_w + wavelength_step, wavelength_step)
+    data_to_combine = np.zeros((len(fs), wavelength_grid.shape[0]))
+    for i, f in enumerate(fs):
+        hdu = fits.open(f)
+        wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
+        overlap = np.logical_and(wavelengths >= overlap_min_w, wavelengths <= overlap_max_w)
+
+        # Reject outliers
+        bad_pixels = find_bad_pixels(hdu['SCI'].data[0], threshold=50)
+
+        # Take the median of the ratio of each spectrum to the first to get the rescaling
+
+        first_fluxes = np.interp(wavelengths[overlap], first_wavelengths, first_hdu['SCI'].data[0], left=0.0, right=0.0)
+        good_pixels = np.ones(hdu['SCI'].data[0].shape[0], dtype=bool)
+        good_pixels[overlap] = np.logical_and(hdu['SCI'].data[0][overlap] != 0.0, first_fluxes != 0.0)
+        good_pixels = np.logical_and(good_pixels, ~(bad_pixels))
+
+        scale = np.median(first_fluxes[good_pixels[overlap]] / hdu['SCI'].data[0][overlap][good_pixels[overlap]])
+        scales.append(scale)
+        hdu['SCI'].data[0][hdu['SCI'].data[0] == 0.0] = -1.e9
+        hdu['SCI'].data[0][bad_pixels] = -1.e9
+        data_to_combine[i] = np.interp(wavelength_grid, wavelengths, hdu['SCI'].data[0], left=0.0, right=0.0)
+        data_to_combine[data_to_combine < 0.0] = 0.0
+        data_to_combine[i] *= scale
 
 
     # write the scales into a file
     ascii.write({'scale': scales}, 'scales.dat', names=['scale'], format='fast_no_header')
 
+    combined_data = data_to_combine.sum(axis=0)
+    weights = (data_to_combine > 0).sum(axis=0)
+    weights[weights == 0.0] = 1.0
+    combined_data /= weights
+
+    first_hdu[0].data = combined_data
+    first_hdu[0].header['CRPIX1'] = 1
+    first_hdu[0].header['CRVAL1'] = min_w
+    first_hdu[0].header['CD1_1'] = wavelength_step
+    first_hdu[0].header['CD2_2'] = 1
+    first_hdu[0].header['CTYPE1'] = 'LINEAR  '
+    first_hdu[0].header['CTYPE2'] = 'LINEAR  '
+    first_hdu[0].header['WAT1_001'] = 'wtype=linear label=Wavelength units=angstroms'
+    first_hdu[0].header['WAT0_001'] = 'system=equispec'
+    first_hdu[0].header['WAT2_001'] = 'wtype=linear'
+    first_hdu[0].header['APNUM1'] = hdu['SCI'].header['APNUM1']
+
+    first_hdu[0].writeto(outfile)
     iraf.unlearn(iraf.scombine)
-    iraf.scombine(iraf_filelist, outfile, scale='@scales.dat', mclip=True,
-                  reject='avsigclip', lthreshold='-1.0', w1=lcogtgemini.bluecut)
+
