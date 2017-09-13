@@ -89,6 +89,9 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # Save the sensitivity in magnitudes
     sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
 
+    observed_hdu[2].header += observed_hdu[0].header
+    observed_hdu[2].header['OBSTYPE'] = 'SENS'
+    observed_hdu[2].header['OBSCLASS'] = 'sensitivity'
     observed_hdu[2].data = utils.fluxtomag(sensitivity)
     observed_hdu[2].writeto(outfile)
 

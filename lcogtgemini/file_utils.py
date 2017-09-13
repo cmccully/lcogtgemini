@@ -72,6 +72,7 @@ def maketxtfiles(fs, obstypes, obsclasses, objname):
     goodfiles = np.logical_and(obsclasses != 'acqCal', obsclasses != 'acq')
     goodfiles = np.logical_and(goodfiles, obstypes != 'BIAS')
     goodfiles = np.logical_and(goodfiles, obsclasses != 'dayCal')
+    goodfiles = np.logical_and(goodfiles, obsclasses != 'sensitivity')
     correct_names = np.logical_or([os.path.basename(f)[0] == 'S' for f in fs],
                                   [os.path.basename(f)[0] == 'N' for f in fs])
     goodfiles = np.logical_and(correct_names, goodfiles)
