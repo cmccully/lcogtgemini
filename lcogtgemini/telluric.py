@@ -75,6 +75,9 @@ def mktelluric(filename, objname, base_stddir):
     good_pixels[-20:] = False
 
     bad_pixels = combine.find_bad_pixels(observed_data)
+    in_telluric = np.logical_and(observed_wavelengths >= 6640.0, observed_wavelengths <= 7040.0)
+    in_telluric = np.logical_or(in_telluric, np.logical_and(observed_wavelengths >= 7550.0, observed_wavelengths <= 7750.0))
+    bad_pixels[in_telluric] = False
     good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
     standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))

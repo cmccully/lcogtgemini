@@ -27,7 +27,7 @@ def flux_calibrate(scifiles):
 
         # Multiply the science spectrum by the corrections
         science_hdu['SCI'].data *= 10 ** (-0.4 * sensitivity_correction)
-        science_hdu['SCI'].data *= float(science_hdu[0].header['EXPTIME'])
+        science_hdu['SCI'].data /= float(science_hdu[0].header['EXPTIME'])
         science_hdu.writeto('cxet' + f[:-4] + '.fits')
 
         if os.path.exists('cxet' + f[:-4] + '.fits'):
@@ -68,6 +68,9 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     good_pixels[-20:] = False
 
     bad_pixels = combine.find_bad_pixels(observed_data)
+    in_telluric = np.logical_and(observed_wavelengths >= 6640.0, observed_wavelengths <= 7040.0)
+    in_telluric = np.logical_or(in_telluric, np.logical_and(observed_wavelengths >= 7550.0, observed_wavelengths <= 7750.0))
+    bad_pixels[in_telluric] = False
     good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
     standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))

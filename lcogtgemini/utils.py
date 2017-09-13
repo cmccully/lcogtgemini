@@ -54,6 +54,6 @@ def convert_pixel_list_to_array(filename, nx, ny):
 
 def rescale1e15(filename):
     hdu = fits.open(filename, mode='update')
-    hdu[0].data *= 1e-15
+    hdu[0].data *= 1e15
     hdu.flush()
     hdu.close()

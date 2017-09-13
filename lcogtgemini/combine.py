@@ -2,20 +2,22 @@ import numpy as np
 import lcogtgemini
 from astropy.io import fits, ascii
 from lcogtgemini import fits_utils
+from astropy.convolution import convolve, Gaussian1DKernel
 
 from pyraf import iraf
 
-def find_bad_pixels(data, threshold=10.0):
+def find_bad_pixels(data, threshold=30.0):
     # Take the abs next pixel diff
     absdiff = np.abs(data[1:] - data[:-1])
+    scaled_diff =  absdiff / convolve(data, Gaussian1DKernel(stddev=20.0))[1:]
     # divide by square root of 2
-    scatter = absdiff / np.sqrt(2.0)
+    scatter = scaled_diff / np.sqrt(2.0)
     # Take the median
     # multply by 1.48 to go from mad to stdev
     scatter = np.median(scatter) * 1.48
 
     # Anything that is a 10 sigma outlier, set to 0
-    deviant_pixels = absdiff > (threshold * scatter)
+    deviant_pixels = scaled_diff > (threshold * scatter)
     bad_pixels = np.zeros(data.shape, dtype=bool)
     bad_pixels[0:-1] = deviant_pixels
     bad_pixels[1:] = np.logical_or(bad_pixels[1:], deviant_pixels)
@@ -56,8 +58,10 @@ def speccombine(fs, outfile):
         overlap = np.logical_and(wavelengths >= overlap_min_w, wavelengths <= overlap_max_w)
 
         # Reject outliers
-        bad_pixels = find_bad_pixels(hdu['SCI'].data[0], threshold=20)
-
+        bad_pixels = find_bad_pixels(hdu['SCI'].data[0])
+        in_telluric = np.logical_and(wavelengths >= 6640.0, wavelengths <= 7040.0)
+        in_telluric = np.logical_or(in_telluric, np.logical_and(wavelengths >= 7550.0, wavelengths <= 7750.0))
+        bad_pixels[in_telluric] = False
         # Take the median of the ratio of each spectrum to the first to get the rescaling
 
         first_fluxes = np.interp(wavelengths[overlap], first_wavelengths, first_hdu['SCI'].data[0], left=0.0, right=0.0)
