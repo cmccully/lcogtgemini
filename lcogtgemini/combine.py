@@ -56,7 +56,7 @@ def speccombine(fs, outfile):
         overlap = np.logical_and(wavelengths >= overlap_min_w, wavelengths <= overlap_max_w)
 
         # Reject outliers
-        bad_pixels = find_bad_pixels(hdu['SCI'].data[0], threshold=50)
+        bad_pixels = find_bad_pixels(hdu['SCI'].data[0], threshold=20)
 
         # Take the median of the ratio of each spectrum to the first to get the rescaling
 

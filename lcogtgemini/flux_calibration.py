@@ -1,13 +1,15 @@
-from pyraf import iraf
 import os
-from lcogtgemini.file_utils import getredorblue
+
 import numpy as np
 from astropy.io import fits, ascii
-from lcogtgemini import fits_utils
+from pyraf import iraf
+
+import lcogtgemini.file_utils
 from lcogtgemini import combine
-from astropy.convolution import convolve, Gaussian1DKernel
+from lcogtgemini import fits_utils
 from lcogtgemini import fitting
 from lcogtgemini import utils
+from lcogtgemini.file_utils import getredorblue, get_standard_file
 
 
 def flux_calibrate(scifiles):
@@ -57,17 +59,7 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     observed_data = observed_hdu[2].data[0]
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[2].header)
 
-    # Read in the telluric model
-    telluric = ascii.read('telluric_model.dat')
-
-
-    # Smooth the telluric spectrum to the size of the slit
-    # I measured 5 angstroms FWHM for a 1 arcsecond slit
-    # the 2.355 converts to sigma
-    smoothing_scale = 5.0 * float(observed_hdu[0].header['MASKNAME'].split('arc')[0]) / 2.355
-
-    telluric['col2'] = convolve(telluric['col2'], Gaussian1DKernel(stddev=smoothing_scale))
-
+    telluric_model = lcogtgemini.file_utils.read_telluric_model(observed_hdu[0].header['MASKNAME'])
     # ignored the chip gaps
     good_pixels = observed_data > 0
 
@@ -84,7 +76,7 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
     best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths, observed_data,
-                                                  telluric['col1'], telluric['col2'], standard['col1'], standard['col2'],
+                                                  telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
                                                   11, 0, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels)
 
     # Strip out the telluric correction
@@ -160,11 +152,3 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
             best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)
 
     return best_fit, n_poly, n_fourier
-
-
-def get_standard_file(objname, base_stddir):
-    if os.path.exists(objname+'.std.dat'):
-        standard_file = objname+'.std.dat'
-    else:
-        standard_file = os.path.join(iraf.osfn('gmisc$lib/onedstds/'), base_stddir, objname + '.dat')
-    return standard_file

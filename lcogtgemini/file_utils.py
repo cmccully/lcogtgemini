@@ -1,7 +1,9 @@
 import numpy as np
-from astropy.io import fits
+from astropy.convolution import convolve, Gaussian1DKernel
+from astropy.io import fits, ascii
 import os
 from glob import glob
+from pyraf import iraf
 
 
 def getobstypes(fs):
@@ -119,3 +121,31 @@ def get_images_from_txt_file(filename):
     with open(filename) as f:
         lines = f.read().splitlines()
     return lines
+
+
+def get_standard_file(objname, base_stddir):
+    if os.path.exists(objname+'.std.dat'):
+        standard_file = objname+'.std.dat'
+    else:
+        standard_file = os.path.join(iraf.osfn('gmisc$lib/onedstds/'), base_stddir, objname + '.dat')
+    return standard_file
+
+
+def read_standard_file(filename, maskname):
+    standard = ascii.read(filename)
+    standard['col2'] = smooth(maskname, standard['col2'])
+    return standard
+
+def read_telluric_model(maskname):
+    # Read in the telluric model
+    telluric = ascii.read('telluric_model.dat')
+    telluric['col2'] = smooth(maskname, telluric['col2'])
+    return telluric
+
+def smooth(maskname, data):
+    # Smooth the spectrum to the size of the slit
+    # I measured 5 angstroms FWHM for a 1 arcsecond slit
+    # the 2.355 converts to sigma
+    smoothing_scale = 5.0 * float(maskname.split('arc')[0]) / 2.355
+
+    return convolve(data, Gaussian1DKernel(stddev=smoothing_scale))
