@@ -92,7 +92,6 @@ def mktelluric(filename, objname, base_stddir):
     standard_wavelengths = recaled_standard_wavelengths *  best_fit['x_range'] +  best_fit['xmin']
     standard_flux = np.interp(observed_wavelengths, standard_wavelengths, best_fit['popt'][6] * standard['col2'])
 
-    import pdb; pdb.set_trace()
     # In the telluric regions
     in_telluric = np.zeros(observed_wavelengths.shape, dtype=bool)
     for region in telluricWaves:
