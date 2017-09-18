@@ -4,11 +4,12 @@ from pyraf import iraf
 import numpy as np
 from astropy.io import fits
 import os
+import time
 
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
         binning = utils.get_binning(f, rawpath)
-        fixed_rawpath = fixpix.fixpix(f, rawpath, binning)
+        fixed_rawpath = fixpix.fixpix(f, rawpath, binning, lcogtgemini.namps)
 
         iraf.unlearn(iraf.gsreduce)
         if lcogtgemini.dobias:
@@ -47,7 +48,7 @@ def calculate_wavelengths(arcfiles, rawpath):
         binning = [float(i) for  i in utils.get_binning(f, rawpath).split('x')]
         for image in images:
             hdu = fits.open(os.path.join(rawpath, image))
-            for i in range(1, 13):
+            for i in range(1, lcogtgemini.namps + 1):
                 print('Calculating wavelengths for {setup} for amplifier {amp}'.format(setup=setupname, amp=i))
                 mosaic_file = mosiac_coordinates(hdu, i, setupname, binning)
                 hdu[i].data = utils.convert_pixel_list_to_array(mosaic_file, hdu[i].data.shape[1], hdu[i].data.shape[0])
@@ -55,10 +56,16 @@ def calculate_wavelengths(arcfiles, rawpath):
 
 
 def mosiac_coordinates(hdu, i, setupname, binning):
+    start_time = time.time()
     # Fake mosaicing
     X, Y = np.meshgrid(np.arange(hdu[i].data.shape[1]) + 1, np.arange(hdu[i].data.shape[0]) + 1)
     X = X.astype(np.float)
     Y = Y.astype(np.float)
+
+    now = time.time()
+    print('1st stop : {x} seconds'.format(x=now - start_time))
+    start_time = now
+
     # Rotate the frame about the center for the given transformation
     x_center = (hdu[i].data.shape[1] / 2.0) + 0.5
     y_center = (hdu[i].data.shape[0] / 2.0) + 0.5
@@ -71,6 +78,10 @@ def mosiac_coordinates(hdu, i, setupname, binning):
 
     X = np.cos(np.radians(rotation)) * X - np.sin(np.radians(rotation)) * Y
     Y = np.sin(np.radians(rotation)) * X - np.cos(np.radians(rotation)) * Y
+
+    now = time.time()
+    print('2nd stop : {x} seconds'.format(x=now - start_time))
+    start_time = now
 
     # Add back in the chip centers
     X += x_center
@@ -86,6 +97,10 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     X += lcogtgemini.xchip_shifts[chip_number] / binning[0]
     Y += lcogtgemini.ychip_shifts[chip_number] / binning[1]
 
+    now = time.time()
+    print('3rd stop : {x} seconds'.format(x=now - start_time))
+    start_time = now
+
     # Write the coordinates to a text file
     lines_to_write = []
     for j, k in zip(X.ravel(), Y.ravel()):
@@ -95,8 +110,19 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     with open(pixel_list, 'w') as file_to_write:
         file_to_write.writelines(lines_to_write)
 
-    output_wavelength_textfile = setupname + '.waves.dat'
+    now = time.time()
+    print('4th stop : {x} seconds'.format(x=now - start_time))
+    start_time = now
+
+    output_wavelength_textfile = setupname + '.{i}.waves.dat'.format(i=i)
     # Then evaluate the fit coords transformation at each pixel
+    iraf.unlearn(iraf.fceval)
+    iraf.flpr()
+    iraf.flpr()
     iraf.fceval(pixel_list, output_wavelength_textfile, setupname + '.arc_001')
+
+    now = time.time()
+    print('5th stop : {x} seconds'.format(x=now - start_time))
+    start_time = now
 
     return output_wavelength_textfile

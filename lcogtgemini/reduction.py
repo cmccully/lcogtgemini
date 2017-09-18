@@ -12,7 +12,7 @@ from lcogtgemini import fits_utils
 def scireduce(scifiles, rawpath):
     for f in scifiles:
         binning = get_binning(f, rawpath)
-        fixed_rawpath = fixpix.fixpix(f, rawpath, binning)
+        fixed_rawpath = fixpix.fixpix(f, rawpath, binning, lcogtgemini.namps)
 
         setupname = getsetupname(f)
         if lcogtgemini.dobias:
@@ -40,7 +40,7 @@ def scireduce(scifiles, rawpath):
         # Flat field the image
         hdu = fits.open(unmosaiced_name, mode='update')
         flat_hdu = fits.open(setupname+'.flat.fits')
-        for i in range(1, 13):
+        for i in range(1, lcogtgemini.namps + 1):
             hdu[i].data /= flat_hdu[i].data
         hdu.flush()
         hdu.close()

@@ -70,11 +70,20 @@ def init_northsouth(fs, topdir, rawpath):
         lcogtgemini.dooverscan = True
         lcogtgemini.do_qecorr = True
         lcogtgemini.detector = 'Hamamatsu'
+        lcogtgemini.namps = 12
         if lcogtgemini.is_GS:
             lcogtgemini.xchip_shifts = [-1.2, 0.0, 0.0]
             lcogtgemini.ychip_shifts = [0.71, 0.0, -0.73]
             lcogtgemini.chip_rotations = [0.0, 0.0, 0.0]
             lcogtgemini.chip_gap_size = 61.0
+    else:
+        lcogtgemini.namps = 3
+        lcogtgemini.dooverscan = True
+        lcogtgemini.chip_gap_size = 37.0
+        lcogtgemini.xchip_shifts = [-1.49, 0.0, 4.31]
+        lcogtgemini.ychip_shifts = [-0.22, 0.0, 2.04]
+        lcogtgemini.chip_rotations = [0.011, 0.0, 0.012]
+        lcogtgemini.detector = 'EEV'
 
     if lcogtgemini.is_GS:
         base_stddir = 'ctionewcal/'

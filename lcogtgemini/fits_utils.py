@@ -70,7 +70,7 @@ def get_x_pixel_range(keyword_value):
     return pixel_sections[0].split(':')
 
 
-def cut_gs_image(filename, output_filename, pixel_range):
+def cut_gs_image(filename, output_filename, pixel_range, namps):
     """
 
     :param filename:
@@ -80,7 +80,7 @@ def cut_gs_image(filename, output_filename, pixel_range):
     :return:
     """
     hdu = fits.open(filename, unit16=True)
-    for i in range(1, 13):
+    for i in range(1, namps + 1):
         ccdsum = hdu[i].header['CCDSUM']
         ccdsum = np.array(ccdsum.split(), dtype=np.int)
 

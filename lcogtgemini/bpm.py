@@ -10,7 +10,7 @@ def get_bad_pixel_mask(binnings, yroi):
             bpm_file = 'bpm_gs.fits'
             bpm_hdu = fits.open(bpm_file, uint16=True)
 
-            for i in range(1, 13):
+            for i in range(1, lcogtgemini.namps + 1):
                 bpm_hdu[i].data = bpm_hdu[i].data[yroi[0]-1:yroi[1]]
                 bpm_hdu[i].writeto('bpm.{i}.unbinned.fits'.format(i=i), overwrite=True)
                 for binning in binnings:
@@ -27,3 +27,12 @@ def get_bad_pixel_mask(binnings, yroi):
                     averaged_bpm[0].data[averaged_bpm[0].data > 0.1] = 1
                     averaged_bpm[0].data = averaged_bpm[0].data.astype(np.uint8)
                     averaged_bpm.writeto(binned_bpm_filename, overwrite=True)
+    else:
+        for binning in binnings:
+            binning_list = binning.split('x')
+            binx, biny = int(binning_list[0]), int(binning_list[1])
+            for i in range(1, lcogtgemini.namps + 1):
+                bpm_data = np.zeros((1024 // int(biny), 2080 // int(binx)), dtype=np.uint8)
+                binned_bpm_filename = 'bpm.{i}.{x}x{y}.fits'.format(i=i, x=binx, y=biny)
+                fits.writeto(binned_bpm_filename, bpm_data)
+

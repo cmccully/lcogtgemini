@@ -1,8 +1,9 @@
 from astropy.io import ascii, fits
 import numpy as np
-from pyraf import iraf
 from lcogtgemini import file_utils
 import os
+from scipy.signal import butter, lfilter
+
 
 def mad(d):
     return np.median(np.abs(np.median(d) - d))
@@ -48,7 +49,7 @@ def get_binning(txt_filename, rawpath):
 
 
 def convert_pixel_list_to_array(filename, nx, ny):
-    data = ascii.read(filename)
+    data = ascii.read(filename, format='fast_no_header')
     return data['col3'].reshape(ny, nx)
 
 
@@ -57,3 +58,18 @@ def rescale1e15(filename):
     hdu[0].data *= 1e15
     hdu.flush()
     hdu.close()
+
+
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y

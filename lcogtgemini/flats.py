@@ -13,7 +13,7 @@ from lcogtgemini import combine
 
 def reduce_flat(flatfile, rawpath):
     binning = get_binning(flatfile, rawpath)
-    fixed_rawpath = fixpix.fixpix(flatfile, rawpath, binning)
+    fixed_rawpath = fixpix.fixpix(flatfile, rawpath, binning, lcogtgemini.namps)
 
     setupname = getsetupname(flatfile, calfile=True)
     # Use IRAF to get put the data in the right format and subtract the
@@ -57,7 +57,8 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         setupname = getsetupname(flatfile, calfile=True)
         flat_hdu = fits.open('t'+ flatfile[:-4] + '.mos.fits')
 
-        data = flat_hdu['SCI'].data[flat_hdu['SCI'].data.shape[0] // 2]
+        # Median out the fringing
+        data = np.median(flat_hdu['SCI'].data, axis=0)
         wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
         errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE'])**2.0)
 
@@ -78,7 +79,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
 
         unmosaiced_hdu = fits.open(unmosaiced_file)
         wavelengths_hdu = fits.open(setupname+'.wavelengths.fits')
-        for i in range(1, 13):
+        for i in range(1, lcogtgemini.namps + 1):
             unmosaiced_hdu[i].data /= fitting.eval_fit(best_fit, wavelengths_hdu[i].data[:unmosaiced_hdu[i].data.shape[0],
                                                                                          :unmosaiced_hdu[i].data.shape[1]])
         unmosaiced_hdu.writeto(flatfile[:-4] + '.fits')

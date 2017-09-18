@@ -57,7 +57,6 @@ def run():
     flatfiles, arcfiles, scifiles = gettxtfiles(fs, objname)
 
     binnings = set([get_binning(scifile, rawpath) for scifile in scifiles])
-
     yroi = get_y_roi(scifiles[0], rawpath)
 
     get_bad_pixel_mask(binnings, yroi)
