@@ -67,6 +67,18 @@ def gettxtfiles(fs, objname):
     return flatfiles, arcfiles, scifiles
 
 
+def get_base_name(f):
+    objname = getobjname(np.array([f]), np.array(['OBJECT']))
+    # Drop the raw/
+    fname = f.split('/')[-1]
+    # red or blue setting
+    redblue = fits.getval(f, 'GRATING')[0].lower()
+    # central wavelength
+    lamcentral = fits.getval(f, 'CENTWAVE')
+
+    return  '%s.%s%i' % (objname, redblue, lamcentral)
+
+
 def maketxtfiles(fs, obstypes, obsclasses, objname):
     # go through each of the files (Ignore bias and aquisition files)
     goodfiles = np.logical_and(obsclasses != 'acqCal', obsclasses != 'acq')

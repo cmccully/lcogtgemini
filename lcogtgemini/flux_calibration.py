@@ -7,6 +7,7 @@ from pyraf import iraf
 import lcogtgemini.file_utils
 from lcogtgemini import combine
 from lcogtgemini import fits_utils
+from lcogtgemini import file_utils
 from lcogtgemini import fitting
 from lcogtgemini import utils
 from lcogtgemini.file_utils import getredorblue, get_standard_file
@@ -40,15 +41,17 @@ def makesensfunc(scifiles, objname, base_stddir):
         # Find the standard star file
         standard_file = get_standard_file(objname, base_stddir)
         redorblue = getredorblue(f)
+        setupname = file_utils.getsetupname(f)
         # If this is a standard star, run standard
         # Standards will have an observation class of either progCal or partnerCal
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
+            wavelengths_filename = objname + '.' + setupname + '.wavelengths.fits'
             specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     standard_file, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
+                     standard_file, wavelengths_filename, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
 
-def specsens(specfile, outfile, stdfile, exptime=None,
+def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
              stdzp=3.68e-20, thresh=8, clobber=True):
 
     # Read in the reference star spectrum
@@ -78,21 +81,33 @@ def specsens(specfile, outfile, stdfile, exptime=None,
     standard['col2'] /= standard_scale
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
-    best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths, observed_data,
-                                                  telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
-                                                  11, 0, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels)
 
-    # Strip out the telluric correction
-    best_fit['popt'] = best_fit['popt'][6:]
-    best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+    wavelengths_hdu = fits.open(wavelengths_filename)
+    chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
+    need_to_interplolate = np.ones(observed_hdu[2].data[0].shape, dtype=bool)
 
-    # Save the sensitivity in magnitudes
-    sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+    for chip in chips:
+        in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
+        best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
+                                                      telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
+                                                      11, 0, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
 
+        # Strip out the telluric correction
+        best_fit['popt'] = best_fit['popt'][6:]
+        best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+
+        # Save the sensitivity in magnitudes
+        sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+        observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
+        need_to_interplolate[in_chip] = False
+
+    observed_hdu[2].data = observed_hdu[2].data[0]
+    observed_hdu[2].data[need_to_interplolate] = np.interp(observed_wavelengths[need_to_interplolate],
+                                                           observed_wavelengths[~need_to_interplolate],
+                                                           observed_hdu[2].data[~need_to_interplolate])
     observed_hdu[2].header += observed_hdu[0].header
     observed_hdu[2].header['OBSTYPE'] = 'SENS'
     observed_hdu[2].header['OBSCLASS'] = 'sensitivity'
-    observed_hdu[2].data = utils.fluxtomag(sensitivity)
     observed_hdu[2].writeto(outfile)
 
 

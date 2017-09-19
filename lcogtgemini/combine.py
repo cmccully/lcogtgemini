@@ -2,7 +2,9 @@ import numpy as np
 import lcogtgemini
 from astropy.io import fits, ascii
 from lcogtgemini import fits_utils
+from lcogtgemini import file_utils
 from astropy.convolution import convolve, Gaussian1DKernel
+from lcogtgemini import utils
 
 from pyraf import iraf
 
@@ -55,6 +57,16 @@ def speccombine(fs, outfile):
     for i, f in enumerate(fs):
         hdu = fits.open(f)
         wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
+        in_chips = np.zeros(wavelengths.shape, dtype=bool)
+        basename = file_utils.get_base_name(f)
+        wavelengths_hdu = fits.open(basename +'.wavelengths.fits')
+        chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
+        for chip in chips:
+            in_chip = np.logical_and(wavelengths >= min(chip), wavelengths <= max(chip))
+            in_chips[in_chip] = True
+
+        hdu['SCI'].data[0][~in_chips] = 0.0
+
         overlap = np.logical_and(wavelengths >= overlap_min_w, wavelengths <= overlap_max_w)
 
         # Reject outliers

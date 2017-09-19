@@ -4,6 +4,7 @@ from lcogtgemini.file_utils import getsetupname
 from lcogtgemini import fits_utils
 from lcogtgemini import fixpix
 from lcogtgemini import fitting
+from lcogtgemini import utils
 import numpy as np
 from pyraf import iraf
 from astropy.io import fits
@@ -56,20 +57,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         reduce_flat(flatfile, rawpath)
         setupname = getsetupname(flatfile, calfile=True)
         flat_hdu = fits.open('t'+ flatfile[:-4] + '.mos.fits')
-
-        # Median out the fringing
-        data = np.median(flat_hdu['SCI'].data, axis=0)
-        wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
-        errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE'])**2.0)
-
-        good_data = data != 0.0
-        # Clip the ends because of craziness that happens at the edges
-        good_data[:20] = False
-        good_data[-20:] = False
-        bad_pixels = combine.find_bad_pixels(data)
-        good_data = np.logical_and(good_data, ~bad_pixels)
-
-        best_fit = fitting.fit_polynomial_fourier_model(wavelengths, data, errors, 11, 31, good_data)
+        wavelengths_hdu = fits.open(setupname+'.wavelengths.fits')
 
         # Open the unmoasiced (and optionally qe corrected flat file)
         if lcogtgemini.do_qecorr:
@@ -78,8 +66,31 @@ def makemasterflat(flatfiles, rawpath, plot=True):
             unmosaiced_file = flatfile[:-4] + '.mef.fits'
 
         unmosaiced_hdu = fits.open(unmosaiced_file)
-        wavelengths_hdu = fits.open(setupname+'.wavelengths.fits')
-        for i in range(1, lcogtgemini.namps + 1):
-            unmosaiced_hdu[i].data /= fitting.eval_fit(best_fit, wavelengths_hdu[i].data[:unmosaiced_hdu[i].data.shape[0],
-                                                                                         :unmosaiced_hdu[i].data.shape[1]])
+
+
+        chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
+        # Median out the fringing
+        data = np.median(flat_hdu['SCI'].data, axis=0)
+        wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
+        errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE']) ** 2.0)
+
+        for chip in chips:
+
+            good_data = data != 0.0
+            # Clip the ends because of craziness that happens at the edges
+            good_data[:20] = False
+            good_data[-20:] = False
+            bad_pixels = combine.find_bad_pixels(data)
+            good_data = np.logical_and(good_data, ~bad_pixels)
+            in_chip = np.logical_and(wavelengths >= min(chip), wavelengths <= max(chip))
+            best_fit = fitting.fit_polynomial_fourier_model(wavelengths[in_chip], data[in_chip], errors[in_chip], 11, 0, good_data[in_chip])
+
+            for i in range(1, lcogtgemini.namps + 1):
+                unmosaiced_wavelengths = wavelengths_hdu[i].data[:unmosaiced_hdu[i].data.shape[0],
+                                         :unmosaiced_hdu[i].data.shape[1]]
+                # If more than half of the wavelengths in this amp are on the chip
+                in_chip = np.logical_and(unmosaiced_wavelengths[midline] >= chip[0], unmosaiced_wavelengths[midline] <= chip[1])
+                if in_chip.sum() > 0.5 * in_chip.shape[0]:
+                    unmosaiced_hdu[i].data /= fitting.eval_fit(best_fit, unmosaiced_wavelengths)
+
         unmosaiced_hdu.writeto(flatfile[:-4] + '.fits')

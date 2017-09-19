@@ -32,3 +32,4 @@ ychip_shifts = [0.0, 0.0, 0.0]
 chip_rotations = [0.0, 0.0, 0.0]
 chip_gap_size = 0.0
 namps = 0
+nchips = 3
