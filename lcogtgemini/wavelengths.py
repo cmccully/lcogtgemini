@@ -2,7 +2,7 @@ import lcogtgemini
 from lcogtgemini import utils, file_utils, fixpix
 from pyraf import iraf
 import numpy as np
-from astropy.io import fits
+from astropy.io import fits, ascii
 import os
 import time
 
@@ -73,7 +73,7 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     X -= x_center
     Y -= y_center
 
-    chip_number = (i - 1) // 4
+    chip_number = (i - 1) // (lcogtgemini.namps // lcogtgemini.nchips)
     rotation = lcogtgemini.chip_rotations[chip_number]
 
     X = np.cos(np.radians(rotation)) * X - np.sin(np.radians(rotation)) * Y
@@ -102,13 +102,8 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     start_time = now
 
     # Write the coordinates to a text file
-    lines_to_write = []
-    for j, k in zip(X.ravel(), Y.ravel()):
-        lines_to_write.append('{x} {y}\n'.format(x=j, y=k))
-
-    pixel_list = setupname+'.{i}.pix.dat'.format(i=i)
-    with open(pixel_list, 'w') as file_to_write:
-        file_to_write.writelines(lines_to_write)
+    pixel_list = setupname + '.{i}.pix.dat'.format(i=i)
+    ascii.write({'x': X.ravel(), 'y': Y.ravel()}, pixel_list, names=['x', 'y'], format='fast_no_header')
 
     now = time.time()
     print('4th stop : {x} seconds'.format(x=now - start_time))

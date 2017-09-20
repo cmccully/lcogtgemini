@@ -78,7 +78,9 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
 def get_wavelengths_of_chips(wavelengths_hdu):
     midline = wavelengths_hdu[1].data.shape[0] // 2
     amps_per_chip = lcogtgemini.namps // lcogtgemini.nchips
-    chips = [(wavelengths_hdu[1 + c * amps_per_chip].data[midline, 10],
-              wavelengths_hdu[(c + 1) * amps_per_chip].data[midline][-10])
-             for c in range(lcogtgemini.nchips)]
+    chips = []
+    for c in range(lcogtgemini.nchips):
+        end_data_range = int(wavelengths_hdu[(c + 1) * amps_per_chip].header['DATASEC'][1:-1].split(',')[0].split(':')[1])
+        chips.append((wavelengths_hdu[1 + c * amps_per_chip].data[midline, 10],
+                      wavelengths_hdu[(c + 1) * amps_per_chip].data[midline, end_data_range - 9]))
     return chips

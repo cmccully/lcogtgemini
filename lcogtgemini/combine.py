@@ -108,7 +108,7 @@ def speccombine(fs, outfile):
     first_hdu[0].header['WAT1_001'] = 'wtype=linear label=Wavelength units=angstroms'
     first_hdu[0].header['WAT0_001'] = 'system=equispec'
     first_hdu[0].header['WAT2_001'] = 'wtype=linear'
-    first_hdu[0].header['APNUM1'] = hdu['SCI'].header['APNUM1']
+    first_hdu[0].header['APNUM1'] = first_hdu['SCI'].header['APNUM1']
 
     first_hdu[0].writeto(outfile)
     iraf.unlearn(iraf.scombine)

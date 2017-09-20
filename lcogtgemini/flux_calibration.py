@@ -46,7 +46,7 @@ def makesensfunc(scifiles, objname, base_stddir):
         # Standards will have an observation class of either progCal or partnerCal
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
-            wavelengths_filename = objname + '.' + setupname + '.wavelengths.fits'
+            wavelengths_filename = setupname + '.wavelengths.fits'
             specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
                      standard_file, wavelengths_filename, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
 
@@ -67,8 +67,8 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
     good_pixels = observed_data > 0
 
     # Clip the edges of the detector where craziness happen.
-    good_pixels[:20] = False
-    good_pixels[-20:] = False
+    good_pixels[:10] = False
+    good_pixels[-10:] = False
 
     bad_pixels = combine.find_bad_pixels(observed_data)
     in_telluric = np.logical_and(observed_wavelengths >= 6640.0, observed_wavelengths <= 7040.0)
@@ -97,7 +97,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
         best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
 
         # Save the sensitivity in magnitudes
-        sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths) * float(observed_hdu[0].header['EXPTIME'])
+        sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
         observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
         need_to_interplolate[in_chip] = False
 
