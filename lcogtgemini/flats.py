@@ -90,7 +90,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
                                          :unmosaiced_hdu[i].data.shape[1]]
                 # If more than half of the wavelengths in this amp are on the chip
                 midline = wavelengths_hdu[i].data.shape[0] // 2
-                in_chip = np.logical_and(unmosaiced_wavelengths[midline] >= chip[0], unmosaiced_wavelengths[midline] <= chip[1])
+                in_chip = np.logical_and(unmosaiced_wavelengths[midline] >= min(chip), unmosaiced_wavelengths[midline] <= max(chip))
                 if in_chip.sum() > 0.5 * in_chip.shape[0]:
                     unmosaiced_hdu[i].data /= fitting.eval_fit(best_fit, unmosaiced_wavelengths)
 

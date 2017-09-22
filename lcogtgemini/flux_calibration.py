@@ -90,7 +90,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
         in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
         best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
                                                       telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
-                                                      11, 0, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
+                                                      3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
 
         # Strip out the telluric correction
         best_fit['popt'] = best_fit['popt'][6:]
