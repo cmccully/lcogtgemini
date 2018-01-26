@@ -79,8 +79,16 @@ def get_wavelengths_of_chips(wavelengths_hdu):
     midline = wavelengths_hdu[1].data.shape[0] // 2
     amps_per_chip = lcogtgemini.namps // lcogtgemini.nchips
     chips = []
+
+    # For each chip
     for c in range(lcogtgemini.nchips):
-        end_data_range = int(wavelengths_hdu[(c + 1) * amps_per_chip].header['DATASEC'][1:-1].split(',')[0].split(':')[1])
-        chips.append((wavelengths_hdu[1 + c * amps_per_chip].data[midline, 10],
-                      wavelengths_hdu[(c + 1) * amps_per_chip].data[midline, end_data_range - 9]))
+        chip_wavelengths = []
+        # For each amplifier on the chip
+        for amplifier in range(c * amps_per_chip + 1, (c + 1) * amps_per_chip + 1):
+            # Get the wavelength 10 pixels into datasec and 10 pixels from the edge of datasec
+            start_data_range, end_data_range = [int(x) for x in wavelengths_hdu[amplifier].header['DATASEC'][1:-1].split(',')[0].split(':')]
+            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, 9 + start_data_range])
+            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, end_data_range - 9])
+        # Take the min and max wavelengths of
+        chips.append((min(chip_wavelengths), max(chip_wavelengths)))
     return chips
