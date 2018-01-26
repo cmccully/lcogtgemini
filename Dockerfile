@@ -17,6 +17,9 @@ RUN conda install -y pip numpy astropy ipython matplotlib scipy statsmodels \
         && conda install -y -c http://ssb.stsci.edu/astroconda iraf-all pyraf-all stsci gemini \
         && conda clean -y --all
 
+RUN conda install setuptools -y \
+    && conda clean -y --all
+
 RUN pip install astroscrappy \
         && rm -rf ~/.cache/pip
 
