@@ -10,6 +10,7 @@ from pyraf import iraf
 from astropy.io import fits
 import os
 from lcogtgemini import combine
+from astropy.table import Table
 
 
 def reduce_flat(flatfile, rawpath):
@@ -74,7 +75,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
         wavelengths = fits_utils.fitshdr_to_wave(flat_hdu['SCI'].header)
         errors = np.sqrt(np.abs(data) + float(flat_hdu['SCI'].header['RDNOISE']) ** 2.0)
 
-        for chip in chips:
+        for nchip, chip in enumerate(chips):
 
             good_data = data != 0.0
             # Clip the ends because of craziness that happens at the edges
@@ -83,11 +84,14 @@ def makemasterflat(flatfiles, rawpath, plot=True):
             bad_pixels = combine.find_bad_pixels(data)
             good_data = np.logical_and(good_data, ~bad_pixels)
             in_chip = np.logical_and(wavelengths >= min(chip), wavelengths <= max(chip))
-            best_fit = fitting.fit_polynomial_fourier_model(wavelengths[in_chip], data[in_chip], errors[in_chip], 11, 0, good_data[in_chip])
+            best_fit = fitting.fit_polynomial_fourier_model(wavelengths[in_chip], data[in_chip], errors[in_chip], 3, 11, good_data[in_chip], weight_scale=10.0)
 
+            Table({'wavelength': wavelengths[in_chip],
+                   'flux': fitting.eval_fit(best_fit, wavelengths[in_chip])}).write('lamp.{0}.{1}.dat'.format(flatfile[:-4], nchip),
+                                                                                    format='ascii.fast_no_header')
             for i in range(1, lcogtgemini.namps + 1):
-                unmosaiced_wavelengths = wavelengths_hdu[i].data[:unmosaiced_hdu[i].data.shape[0],
-                                         :unmosaiced_hdu[i].data.shape[1]]
+                x_pixel_range =  fits_utils.get_x_pixel_range(wavelengths_hdu[i].header['DATASEC'])
+                unmosaiced_wavelengths = wavelengths_hdu[i].data[:, int(x_pixel_range[0]) - 1:int(x_pixel_range[1])]
                 # If more than half of the wavelengths in this amp are on the chip
                 midline = wavelengths_hdu[i].data.shape[0] // 2
                 in_chip = np.logical_and(unmosaiced_wavelengths[midline] >= min(chip), unmosaiced_wavelengths[midline] <= max(chip))
