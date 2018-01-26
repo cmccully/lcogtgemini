@@ -76,9 +76,6 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
     bad_pixels[in_telluric] = False
     good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
-    standard_scale = np.median(np.interp(observed_wavelengths[good_pixels], standard['col1'], standard['col2']))
-
-    standard['col2'] /= standard_scale
     # Fit a combination of the telluric absorption multiplied by a constant + a polynomial-fourier model of
     # sensitivity
 
@@ -88,6 +85,9 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
 
     for chip in chips:
         in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
+        standard_scale = np.median(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
+
+        standard['col2'] /= standard_scale
         best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
                                                       telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
                                                       3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
@@ -100,6 +100,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
         sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
         observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
         need_to_interplolate[in_chip] = False
+        standard['col2'] *= standard_scale
 
     observed_hdu[2].data = observed_hdu[2].data[0]
     observed_hdu[2].data[need_to_interplolate] = np.interp(observed_wavelengths[need_to_interplolate],
@@ -156,6 +157,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
     p0 = init_p0(n_poly, n_fourier)
     errors = np.sqrt(np.abs(data) + readnoise ** 2.0)
     best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)
+
     # Go into a while loop
     while True:
         # Ask if the user is not happy with the fit,
