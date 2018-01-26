@@ -11,6 +11,8 @@ from pyraf import iraf
 iraf.cd(os.getcwd())
 iraf.gemini()
 iraf.gmos()
+iraf.twodspec()
+iraf.apextract()
 iraf.onedspec()
 
 bluecut = 3450
