@@ -90,12 +90,21 @@ def mosiac_coordinates(hdu, i, setupname, binning):
     # Add in the X detsec
     X += (float(hdu[i].header['DETSEC'][1:].split(':')[0]) - 1.0) / binning[0]
 
+    # Add in the X starting datasec
+    X -= (float(hdu[i].header['DATASEC'][1:].split(':')[0]) - 1.0)
+
     # Add in the chip gaps * (i - 1) // 4
     X += chip_number * lcogtgemini.chip_gap_size / binning[0]
 
     # Add in the chip shifts
     X += lcogtgemini.xchip_shifts[chip_number] / binning[0]
     Y += lcogtgemini.ychip_shifts[chip_number] / binning[1]
+
+    # Account for the fact that the center of binned pixels is not the center of unbinned pixels
+    # Currently this assumes that the binning is 2 and there are 3 chips
+    # I could not find any corresponding shift in the Y. Hopefully that is not a problem....
+    if binning[0] > 1:
+        X += (chip_number - 2) / binning[0]
 
     now = time.time()
     print('3rd stop : {x} seconds'.format(x=now - start_time))
