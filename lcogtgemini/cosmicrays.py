@@ -27,7 +27,7 @@ def crreject(scifiles):
         if lcogtgemini.dodq:
             mask = np.logical_or(mask,  hdu['DQ'].data)
 
-        crmask, _cleanarr = detect_cosmics(d, inmask=mask, sigclip=7.0,
+        crmask, _cleanarr = detect_cosmics(d, inmask=mask, sigclip=5.0,
                                            objlim=10.0, sigfrac=0.2, gain=1.0,
                                            readnoise=readnoise, pssl=pssl)
 
