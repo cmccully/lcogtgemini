@@ -117,6 +117,7 @@ def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correctio
     poly_fourier_model = fitting.polynomial_fourier_model(n_poly, n_fourier)
     normalized_telluric_wavelengths = (telluric_waves - wavelength_min) / wavelength_range
     normalized_standard_wavelengths = (std_waves - wavelength_min) / wavelength_range
+
     def sensitivity_model(x, *p):
         # p 0, 1, 2 are for telluric fitting.
         # 0 and 1 linear wavelength shift and scale for telluric
@@ -149,7 +150,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
         p0[0] = 0.0
         p0[1] = 1.0
         p0[2] = 1.0
-        p0[3] = 1.0
+        p0[3] = 0.1
         p0[4] = 0.0
         p0[5] = 1.0
         p0[6] = 1.0
