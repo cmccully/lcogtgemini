@@ -115,6 +115,7 @@ def updatecomheader(extractedfiles, filename):
         exptimes.append(float(fits.getval(f, 'EXPTIME')))
 
     fits.setval(filename, 'AIRMASS', value=np.mean(airmasses))
+    fits.setval(filename, 'EXPTIME', value=np.sum(exptimes))
     fits.setval(filename, 'SLIT', value=fits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
 
     comhdu = fits.open(filename, mode='update')
