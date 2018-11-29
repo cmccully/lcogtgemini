@@ -86,16 +86,20 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename):
         standard_scale = np.median(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
 
         standard['col2'] /= standard_scale
-        best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
-                                                      telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
-                                                      3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
+        if good_pixels[in_chip].sum() > 32:  # 32 = 7 + 3 + 2 * 11 = number of parameters in default model
+            best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
+                                                          telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
+                                                          3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
 
-        # Strip out the telluric correction
-        best_fit['popt'] = best_fit['popt'][6:]
-        best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+            # Strip out the telluric correction
+            best_fit['popt'] = best_fit['popt'][6:]
+            best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
 
-        # Save the sensitivity in magnitudes
-        sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
+            # Save the sensitivity in magnitudes
+            sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
+        else:
+            sensitivity = np.ones(in_chip.sum())
+
         observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
         need_to_interplolate[in_chip] = False
         standard['col2'] *= standard_scale
