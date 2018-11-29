@@ -1,66 +1,65 @@
 import lcogtgemini
-import numpy as np
 from pyraf import iraf
 import os
 from glob import glob
 from astropy.io import fits
 
-def sort():
-    if not os.path.exists('raw'):
-        iraf.mkdir('raw')
-    fs = glob('*.fits')
-    fs += glob('*.dat')
-    for f in fs:
-        iraf.mv(f, 'raw/')
 
+def sort(workpath, rawpath):
     # Make a reduction directory
-    if not os.path.exists('work'):
-        iraf.mkdir('work')
+    if not os.path.exists(workpath):
+        iraf.mkdir(workpath)
 
-    sensfs = glob('raw/sens*.fits')
+    sensfs = glob('sens*.fits')
     if len(sensfs) != 0:
         for f in sensfs:
-            iraf.cp(f, 'work/')
+            iraf.cp(f, workpath)
 
-    if os.path.exists('raw/telcor.dat'):
-        iraf.cp('raw/telcor.dat', 'work/')
+    if os.path.exists('telcor.dat'):
+        iraf.cp('telcor.dat', workpath)
 
-    if os.path.exists('raw/telluric_model.dat'):
-        iraf.cp('raw/telluric_model.dat', 'work/')
+    if os.path.exists('telluric_model.dat'):
+        iraf.cp('telluric_model.dat', workpath)
 
-    std_files = glob('raw/*.std.dat')
+    std_files = glob('*.std.dat')
     if len(std_files) != 0:
         for f in std_files:
-            iraf.cp(f, 'work/')
+            iraf.cp(f, workpath)
 
-    if os.path.exists('raw/bias.fits'):
-        iraf.cp('raw/bias.fits', 'work/')
+    if os.path.exists('bias.fits'):
+        iraf.cp('bias.fits', workpath)
 
-    bpm_file_list = glob('raw/bpm_g?.fits')
-    if len(bpm_file_list) != 0:
-        iraf.cp(bpm_file_list[0], 'work/')
+    bpm_file_list = glob('bpm_g?.fits')
+    for bpm_file in bpm_file_list:
+        iraf.cp(bpm_file, workpath)
 
-    fs = glob('raw/*.qe.fits')
+    fs = glob('*.qe.fits')
     if len(fs) > 0:
         for f in fs:
-            iraf.cp(f, 'work/')
+            iraf.cp(f, workpath)
 
-    fs = glob('raw/*.wavelengths.fits')
+    fs = glob('*.wavelengths.fits')
     if len(fs) > 0:
         for f in fs:
-            iraf.cp(f, 'work/')
+            iraf.cp(f, workpath)
 
-    fs = glob('raw/*.flat.fits')
+    fs = glob('*.flat.fits')
     if len(fs) > 0:
         for f in fs:
-            iraf.cp(f, 'work/')
+            iraf.cp(f, workpath)
 
+    if not os.path.exists(rawpath):
+        iraf.mkdir(rawpath)
+    for f in glob('*.fits') + glob('*.dat'):
+        iraf.mv(f, rawpath)
+
+
+def get_raw_files(rawpath):
     # make a list of the raw files
-    fs = glob('raw/*.fits')
-    # Add a ../ in front of all of the file names
-    for i in range(len(fs)):
-        fs[i] = '../' + fs[i]
-    return np.array(fs)
+    fs = set(glob(os.path.join(rawpath, '*.fits')))
+    fs -= set(glob(os.path.join(rawpath, 'sens*.fits')))
+    fs -= set(glob(os.path.join(rawpath, 'bpm_g?.fits')))
+    return fs
 
 
 def init_northsouth(fs):
