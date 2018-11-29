@@ -42,7 +42,7 @@ def run():
     iraf.cd('work')
 
     # Initialize variables that depend on which site was used
-    extfile, observatory, base_stddir, rawpath = init_northsouth(fs, topdir, rawpath)
+    extfile, base_stddir = init_northsouth(fs)
 
     # Get the observation type
     obstypes, obsclasses = getobstypes(fs)
@@ -54,9 +54,9 @@ def run():
     maketxtfiles(fs, obstypes, obsclasses, objname)
 
     # remember not to put ".fits" on the end of filenames!
-    flatfiles, arcfiles, scifiles = gettxtfiles(fs, objname)
+    flatfiles, arcfiles, scifiles = gettxtfiles(objname)
 
-    binnings = set([get_binning(scifile, rawpath) for scifile in scifiles])
+    binnings = {get_binning(scifile, rawpath) for scifile in scifiles}
     yroi = get_y_roi(scifiles[0], rawpath)
 
     get_bad_pixel_mask(binnings, yroi)
@@ -82,7 +82,7 @@ def run():
     scireduce(scifiles, rawpath)
 
     # Run sky subtraction
-    skysub(scifiles, rawpath)
+    skysub(scifiles)
 
     # Run LA Cosmic
     crreject(scifiles)
@@ -120,7 +120,7 @@ def run():
     # Update the combined file with the necessary header keywords
     updatecomheader(extractedfiles, objname + '.fits')
 
-    #Clean the data of nans and infs
+    # Clean the data of nans and infs
     clean_nans(objname + '.fits')
 
     # Write out the ascii file

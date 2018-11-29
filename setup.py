@@ -5,5 +5,5 @@ setup(name='lcogtgemini',
       author_email=['cmccully@lco.global'],
       version=0.1,
       packages=['lcogtgemini'],
-      install_requires=['numpy', 'astropy', 'scipy'],
+      install_requires=['numpy', 'astropy', 'scipy', 'matplotlib', 'pyraf', 'astroscrappy', 'statsmodels'],
       entry_points={'console_scripts': ['reduce_gemini=lcogtgemini.main:run']})

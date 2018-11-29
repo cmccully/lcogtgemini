@@ -32,7 +32,7 @@ def scireduce(scifiles, rawpath):
             iraf.unlearn(iraf.gqecorr)
             iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True,
                          fl_vardq=lcogtgemini.dodq, refimages=setupname + '.arc.arc.fits',
-                         corrimages=setupname +'.qe.fits', verbose=True)
+                         corrimages=setupname + '.qe.fits', verbose=True)
             unmosaiced_name = f[:-4]+'.qe.fits'
         else:
             unmosaiced_name = f[:-4]+'.mef.fits'
@@ -44,7 +44,6 @@ def scireduce(scifiles, rawpath):
             hdu[i].data /= flat_hdu[i].data
         hdu.flush()
         hdu.close()
-
 
         iraf.unlearn(iraf.gmosaic)
         iraf.gmosaic(unmosaiced_name, outimages=f[:-4] + '.fits', fl_vardq=lcogtgemini.dodq,
@@ -66,10 +65,10 @@ def extract(scifiles):
                        lsigma=3.0, usigma=3.0, tnsum=100, tstep=100, mode='h')
 
         # Trim off below the blue side cut
-        hdu = fits.open('et' + f[:-4] +'.fits', mode='update')
+        hdu = fits.open('et' + f[:-4] + '.fits', mode='update')
         lam = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
         w = lam > lcogtgemini.bluecut
-        trimmed_data =np.zeros((1, w.sum()))
+        trimmed_data = np.zeros((1, w.sum()))
         trimmed_data[0] = hdu['SCI'].data[0, w]
         hdu['SCI'].data = trimmed_data
         hdu['SCI'].header['NAXIS1'] = w.sum()

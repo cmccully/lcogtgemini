@@ -20,7 +20,7 @@ def get_bad_pixel_mask(binnings, yroi):
                 binning_list = binning.split('x')
                 binx, biny = int(binning_list[0]), int(binning_list[1])
                 iraf.unlearn('blkavg')
-                binned_bpm_filename = 'bpm.{i}.{x}x{y}.fits'.format(i=i,x=binx, y=biny)
+                binned_bpm_filename = 'bpm.{i}.{x}x{y}.fits'.format(i=i, x=binx, y=biny)
                 iraf.blkavg('bpm.{i}.unbinned.fits[1]'.format(i=i),
                             binned_bpm_filename, binx, biny)
                 averaged_bpm = fits.open(binned_bpm_filename)
@@ -39,4 +39,3 @@ def get_bad_pixel_mask(binnings, yroi):
                 bpm_data = np.zeros((2048 // int(biny), 1080 // int(binx)), dtype=np.uint8)
                 binned_bpm_filename = 'bpm.{i}.{x}x{y}.fits'.format(i=i, x=binx, y=biny)
                 fits.writeto(binned_bpm_filename, bpm_data)
-

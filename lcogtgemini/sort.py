@@ -63,7 +63,7 @@ def sort():
     return np.array(fs)
 
 
-def init_northsouth(fs, topdir, rawpath):
+def init_northsouth(fs):
     lcogtgemini.is_GS = fits.getval(fs[0], 'OBSERVAT') == 'Gemini-South'
 
     if 'Hamamatsu' in fits.getval(fs[0], 'DETECTOR'):
@@ -79,7 +79,7 @@ def init_northsouth(fs, topdir, rawpath):
         else:
             lcogtgemini.xchip_shifts = [-0.95, 0.0, 0.48]
             lcogtgemini.ychip_shifts = [-0.21739, 0.0, 0.1727]
-            lcogtgemini.chip_rotations = [-0.004, 0.0, -0.00537 ]
+            lcogtgemini.chip_rotations = [-0.004, 0.0, -0.00537]
             lcogtgemini.chip_gap_size = 67.0
     elif not lcogtgemini.is_GS:
         lcogtgemini.namps = 6
@@ -92,10 +92,8 @@ def init_northsouth(fs, topdir, rawpath):
 
     if lcogtgemini.is_GS:
         base_stddir = 'ctionewcal/'
-        observatory = 'Gemini-South'
         extfile = iraf.osfn('gmisc$lib/onedstds/ctioextinct.dat')
     else:
         base_stddir = 'spec50cal/'
         extfile = iraf.osfn('gmisc$lib/onedstds/kpnoextinct.dat')
-        observatory = 'Gemini-North'
-    return extfile, observatory, base_stddir, rawpath
+    return extfile, base_stddir

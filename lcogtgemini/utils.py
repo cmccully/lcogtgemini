@@ -46,7 +46,7 @@ def boxcar_smooth(spec_wave, spec_flux, smoothwidth):
 def get_binning(txt_filename, rawpath):
     with open(txt_filename) as f:
         lines = f.readlines()
-    return fits.getval(rawpath + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
+    return fits.getval(os.path.join(rawpath, lines[0].rstrip()), 'CCDSUM', 1).replace(' ', 'x')
 
 
 def convert_pixel_list_to_array(filename, nx, ny):
@@ -61,7 +61,6 @@ def rescale1e15(filename):
     hdu.close()
 
 
-
 def butter_bandpass(lowcut, highcut, fs, order=5):
     nyq = 0.5 * fs
     low = lowcut / nyq
@@ -74,6 +73,7 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
     y = lfilter(b, a, data)
     return y
+
 
 def get_wavelengths_of_chips(wavelengths_hdu):
     midline = wavelengths_hdu[1].data.shape[0] // 2

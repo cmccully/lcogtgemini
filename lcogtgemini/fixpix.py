@@ -19,4 +19,3 @@ def run_fixpix(filename, maskname):
     # Run fixpix to interpolate over cosmic rays and bad pixels
     iraf.unlearn(iraf.fixpix)
     iraf.fixpix(filename, maskname, mode='h')
-

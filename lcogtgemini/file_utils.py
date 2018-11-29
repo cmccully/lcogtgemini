@@ -45,7 +45,7 @@ def getsetupname(f, calfile=False):
     return setupname
 
 
-def gettxtfiles(fs, objname):
+def gettxtfiles(objname):
 
     flatfiles = np.array(glob('*.flat.txt'))
 
@@ -58,7 +58,8 @@ def gettxtfiles(fs, objname):
     nonscifiles = []
     # remove the arcs and flats
     for f in scifiles:
-        if 'arc' in f or 'flat' in f: nonscifiles.append(f)
+        if 'arc' in f or 'flat' in f:
+            nonscifiles.append(f)
 
     for f in nonscifiles:
         scifiles.remove(f)
@@ -69,21 +70,19 @@ def gettxtfiles(fs, objname):
 
 def get_base_name(f):
     objname = getobjname(np.array([f]), np.array(['OBJECT']))
-    # Drop the raw/
-    fname = f.split('/')[-1]
     # red or blue setting
     redblue = fits.getval(f, 'GRATING')[0].lower()
     # central wavelength
     lamcentral = fits.getval(f, 'CENTWAVE')
 
-    return  '%s.%s%i' % (objname, redblue, lamcentral)
+    return '%s.%s%i' % (objname, redblue, lamcentral)
 
 
 def maketxtfiles(fs, obstypes, obsclasses, objname):
     # go through each of the files (Ignore bias and aquisition files)
     goodfiles = np.logical_and(obsclasses != 'acqCal', obsclasses != 'acq')
     goodfiles = np.logical_and(goodfiles, obstypes != 'BIAS')
-    goodfiles = np.logical_and(goodfiles, obstypes!='BPM')
+    goodfiles = np.logical_and(goodfiles, obstypes != 'BPM')
     goodfiles = np.logical_and(goodfiles, obsclasses != 'sensitivity')
     correct_names = np.logical_or([os.path.basename(f)[0] == 'S' for f in fs],
                                   [os.path.basename(f)[0] == 'N' for f in fs])
@@ -149,11 +148,13 @@ def read_standard_file(filename, maskname):
     standard['col2'] = smooth(maskname, standard['col2'])
     return standard
 
+
 def read_telluric_model(maskname):
     # Read in the telluric model
     telluric = ascii.read('telluric_model.dat')
     telluric['col2'] = smooth(maskname, telluric['col2'])
     return telluric
+
 
 def smooth(maskname, data):
     # Smooth the spectrum to the size of the slit

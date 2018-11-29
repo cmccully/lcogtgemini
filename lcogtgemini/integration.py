@@ -86,7 +86,7 @@ class integrate:
         result4d[:, :, :-1, :-1] = d[:-1, :-1].reshape((ny, subsampy, nx, subsampx)).swapaxes(1, 2)
 
         result4d[:, :, :-1, -1] = d[:-1, subsampx::subsampx].reshape(ny, subsampy, nx).swapaxes(1, 2)
-        result4d[:, :, -1, :-1] = d[subsampy::subsampy, :-1].reshape(ny, nx, subsamy)
+        result4d[:, :, -1, :-1] = d[subsampy::subsampy, :-1].reshape(ny, nx, subsampy)
         result4d[:, :, -1, -1] = d[subsampy::subsampy, subsampx::subsampx]
 
         return result4d

@@ -22,7 +22,7 @@ def flux_calibrate(scifiles):
         sensitivity_wavelengths = fits_utils.fitshdr_to_wave(sensitivity_hdu['SCI'].header)
 
         # Interpolate the sensitivity onto the science wavelengths
-        science_hdu = fits.open('xet'+ f.replace('.txt', '.fits'))
+        science_hdu = fits.open('xet' + f.replace('.txt', '.fits'))
         science_wavelengths = fits_utils.fitshdr_to_wave(science_hdu['SCI'].header)
         sensitivity_correction = np.interp(science_wavelengths, sensitivity_wavelengths, sensitivity_hdu['SCI'].data)
 
@@ -47,12 +47,10 @@ def makesensfunc(scifiles, objname, base_stddir):
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
             wavelengths_filename = setupname + '.wavelengths.fits'
-            specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     standard_file, wavelengths_filename, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
+            specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits', standard_file, wavelengths_filename)
 
 
-def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
-             stdzp=3.68e-20, thresh=8, clobber=True):
+def specsens(specfile, outfile, stdfile, wavelengths_filename):
 
     # Read in the reference star spectrum
     standard = ascii.read(stdfile, comment='#')
@@ -123,7 +121,7 @@ def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correctio
         # 0 and 1 linear wavelength shift and scale for telluric
         # 2 is power of telluric correction for the O2 A and B bands
         # 3 is the power of the telluric correction for the water bands (the rest of the telluric features)
-        shifted_telluric_wavelengths =  p[1] * (normalized_telluric_wavelengths - p[0])
+        shifted_telluric_wavelengths = p[1] * (normalized_telluric_wavelengths - p[0])
         telluric_model = np.interp(x, shifted_telluric_wavelengths, telluric_correction,
                                    left=1.0, right=1.0)
 
@@ -145,6 +143,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
     _, wavelength_min, wavelength_range = fitting.normalize_fitting_coordinate(wavelengths)
     function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux,
                                              wavelength_min, wavelength_range)
+
     def init_p0(n_poly, n_fourier):
         p0 = np.zeros(7 + n_poly + 2 * n_fourier)
         p0[0] = 0.0
@@ -155,6 +154,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
         p0[5] = 1.0
         p0[6] = 1.0
         return p0
+
     p0 = init_p0(n_poly, n_fourier)
     errors = np.sqrt(np.abs(data) + readnoise ** 2.0)
     best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)

@@ -8,10 +8,11 @@ from lcogtgemini import utils
 
 from pyraf import iraf
 
+
 def find_bad_pixels(data, threshold=30.0):
     # Take the abs next pixel diff
     absdiff = np.abs(data[1:] - data[:-1])
-    scaled_diff =  absdiff / convolve(data, Gaussian1DKernel(stddev=20.0))[1:]
+    scaled_diff = absdiff / convolve(data, Gaussian1DKernel(stddev=20.0))[1:]
     # divide by square root of 2
     scatter = scaled_diff / np.sqrt(2.0)
     # Take the median
@@ -59,7 +60,7 @@ def speccombine(fs, outfile):
         wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
         in_chips = np.zeros(wavelengths.shape, dtype=bool)
         basename = file_utils.get_base_name(f)
-        wavelengths_hdu = fits.open(basename +'.wavelengths.fits')
+        wavelengths_hdu = fits.open(basename + '.wavelengths.fits')
         chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
         for chip in chips:
             in_chip = np.logical_and(wavelengths >= min(chip), wavelengths <= max(chip))
@@ -79,7 +80,7 @@ def speccombine(fs, outfile):
         first_fluxes = np.interp(wavelengths[overlap], first_wavelengths, first_hdu['SCI'].data[0], left=0.0, right=0.0)
         good_pixels = np.ones(hdu['SCI'].data[0].shape[0], dtype=bool)
         good_pixels[overlap] = np.logical_and(hdu['SCI'].data[0][overlap] != 0.0, first_fluxes != 0.0)
-        good_pixels = np.logical_and(good_pixels, ~(bad_pixels))
+        good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
         scale = np.median(first_fluxes[good_pixels[overlap]] / hdu['SCI'].data[0][overlap][good_pixels[overlap]])
         scales.append(scale)
@@ -88,7 +89,6 @@ def speccombine(fs, outfile):
         data_to_combine[i] = np.interp(wavelength_grid, wavelengths, hdu['SCI'].data[0], left=0.0, right=0.0)
         data_to_combine[data_to_combine < 0.0] = 0.0
         data_to_combine[i] *= scale
-
 
     # write the scales into a file
     ascii.write({'scale': scales}, 'scales.dat', names=['scale'], format='fast_no_header')
@@ -112,4 +112,3 @@ def speccombine(fs, outfile):
 
     first_hdu[0].writeto(outfile)
     iraf.unlearn(iraf.scombine)
-

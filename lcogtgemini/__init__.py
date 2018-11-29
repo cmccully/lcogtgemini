@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-'''
+"""
 Created on Nov 7, 2014
 
 @author: cmccully
-'''
+"""
 
 import os
 from pyraf import iraf

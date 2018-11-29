@@ -3,6 +3,7 @@ from glob import glob
 from astropy.io import fits
 from pyraf import iraf
 import numpy as np
+import os
 
 
 def makebias(fs, obstypes, rawpath):

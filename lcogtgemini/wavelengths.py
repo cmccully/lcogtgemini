@@ -6,6 +6,7 @@ from astropy.io import fits, ascii
 import os
 import time
 
+
 def wavesol(arcfiles, rawpath):
     for f in arcfiles:
         binning = utils.get_binning(f, rawpath)
@@ -20,7 +21,6 @@ def wavesol(arcfiles, rawpath):
                       fl_flat=False, bias=bias_filename, fl_bias=lcogtgemini.dobias,
                       fl_fixpix=False, fl_over=lcogtgemini.dooverscan, fl_cut=False, fl_gmosaic=True,
                       fl_gsappwave=True, fl_oversize=False, fl_vardq=lcogtgemini.dodq)
-
 
         # determine wavelength calibration -- 1d and 2d
         iraf.unlearn(iraf.gswavelength)
@@ -45,7 +45,7 @@ def calculate_wavelengths(arcfiles, rawpath):
         if os.path.exists(output_file):
             # short circuit
             return
-        binning = [float(i) for  i in utils.get_binning(f, rawpath).split('x')]
+        binning = [float(i) for i in utils.get_binning(f, rawpath).split('x')]
         for image in images:
             hdu = fits.open(os.path.join(rawpath, image))
             for i in range(1, lcogtgemini.namps + 1):
@@ -127,6 +127,5 @@ def mosiac_coordinates(hdu, i, setupname, binning):
 
     now = time.time()
     print('5th stop : {x} seconds'.format(x=now - start_time))
-    start_time = now
 
     return output_wavelength_textfile
