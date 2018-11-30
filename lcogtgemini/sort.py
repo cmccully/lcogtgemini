@@ -5,6 +5,7 @@ import os
 from glob import glob
 from astropy.io import fits
 
+
 def sort():
     if not os.path.exists('raw'):
         iraf.mkdir('raw')
@@ -57,6 +58,8 @@ def sort():
 
     # make a list of the raw files
     fs = glob('raw/*.fits')
+    for f in sensfs + bpm_file_list:
+        fs.remove(f)
     # Add a ../ in front of all of the file names
     for i in range(len(fs)):
         fs[i] = '../' + fs[i]
