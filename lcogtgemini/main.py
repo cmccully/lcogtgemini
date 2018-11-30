@@ -12,7 +12,7 @@ from lcogtgemini.flats import makemasterflat
 from lcogtgemini.flux_calibration import flux_calibrate, makesensfunc
 from lcogtgemini.extinction import correct_for_extinction
 from lcogtgemini.file_utils import getobstypes, getobjname, gettxtfiles, maketxtfiles
-from lcogtgemini.sort import sort, get_raw_files, init_northsouth
+from lcogtgemini.sort import sort, init_northsouth
 from lcogtgemini.bpm import get_bad_pixel_mask
 from lcogtgemini.utils import get_y_roi
 from lcogtgemini.bias import makebias
@@ -32,15 +32,14 @@ def run():
     # os.system('ds9 &')
 
     topdir = os.getcwd()
-    workpath = os.path.abspath('work')
-    rawpath = os.path.abspath('raw')
+    # Get the raw directory
+    rawpath = '%s/raw/' % topdir
 
     # Sort the files into the correct directories
-    sort(workpath, rawpath)
-    fs = get_raw_files(rawpath)
+    fs = sort()
 
     # Change into the reduction directory
-    iraf.cd(workpath)
+    iraf.cd('work')
 
     # Initialize variables that depend on which site was used
     extfile, base_stddir = init_northsouth(fs)
@@ -131,7 +130,7 @@ def run():
     rescale1e15(objname + '.fits')
 
     # Change out of the reduction directory
-    iraf.cd(topdir)
+    iraf.cd('..')
 
 
 if __name__ == "__main__":
