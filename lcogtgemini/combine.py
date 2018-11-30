@@ -2,11 +2,7 @@ import numpy as np
 import lcogtgemini
 from astropy.io import fits, ascii
 from lcogtgemini import fits_utils
-from lcogtgemini import file_utils
 from astropy.convolution import convolve, Gaussian1DKernel
-from lcogtgemini import utils
-
-from pyraf import iraf
 
 
 def find_bad_pixels(data, threshold=30.0):
@@ -58,16 +54,6 @@ def speccombine(fs, outfile):
     for i, f in enumerate(fs):
         hdu = fits.open(f)
         wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
-        in_chips = np.zeros(wavelengths.shape, dtype=bool)
-        basename = file_utils.get_base_name(f)
-        wavelengths_hdu = fits.open(basename + '.wavelengths.fits')
-        chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
-        for chip in chips:
-            in_chip = np.logical_and(wavelengths >= min(chip), wavelengths <= max(chip))
-            in_chips[in_chip] = True
-
-        hdu['SCI'].data[0][~in_chips] = 0.0
-
         overlap = np.logical_and(wavelengths >= overlap_min_w, wavelengths <= overlap_max_w)
 
         # Reject outliers
@@ -75,30 +61,24 @@ def speccombine(fs, outfile):
         in_telluric = np.logical_and(wavelengths >= 6640.0, wavelengths <= 7040.0)
         in_telluric = np.logical_or(in_telluric, np.logical_and(wavelengths >= 7550.0, wavelengths <= 7750.0))
         bad_pixels[in_telluric] = False
-        # Take the median of the ratio of each spectrum to the first to get the rescaling
 
         first_fluxes = np.interp(wavelengths[overlap], first_wavelengths, first_hdu['SCI'].data[0], left=0.0, right=0.0)
         good_pixels = np.ones(hdu['SCI'].data[0].shape[0], dtype=bool)
         good_pixels[overlap] = np.logical_and(hdu['SCI'].data[0][overlap] != 0.0, first_fluxes != 0.0)
         good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
+        # Take the median of the ratio of each spectrum to the first to get the rescaling
         scale = np.median(first_fluxes[good_pixels[overlap]] / hdu['SCI'].data[0][overlap][good_pixels[overlap]])
         scales.append(scale)
-        hdu['SCI'].data[0][hdu['SCI'].data[0] == 0.0] = -1.e9
-        hdu['SCI'].data[0][bad_pixels] = -1.e9
+        hdu['SCI'].data[0][hdu['SCI'].data[0] == 0.0] = np.nan
+        hdu['SCI'].data[0][bad_pixels] = np.nan
         data_to_combine[i] = np.interp(wavelength_grid, wavelengths, hdu['SCI'].data[0], left=0.0, right=0.0)
-        data_to_combine[data_to_combine < 0.0] = 0.0
         data_to_combine[i] *= scale
 
     # write the scales into a file
     ascii.write({'scale': scales}, 'scales.dat', names=['scale'], format='fast_no_header')
 
-    combined_data = data_to_combine.sum(axis=0)
-    weights = (data_to_combine > 0).sum(axis=0)
-    weights[weights == 0.0] = 1.0
-    combined_data /= weights
-
-    first_hdu[0].data = combined_data
+    first_hdu[0].data = np.nanmean(data_to_combine, axis=0)
     first_hdu[0].header['CRPIX1'] = 1
     first_hdu[0].header['CRVAL1'] = min_w
     first_hdu[0].header['CD1_1'] = wavelength_step
@@ -111,4 +91,3 @@ def speccombine(fs, outfile):
     first_hdu[0].header['APNUM1'] = first_hdu['SCI'].header['APNUM1']
 
     first_hdu[0].writeto(outfile)
-    iraf.unlearn(iraf.scombine)
