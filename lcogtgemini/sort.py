@@ -26,9 +26,6 @@ def sort():
     if os.path.exists('raw/telcor.dat'):
         iraf.cp('raw/telcor.dat', 'work/')
 
-    if os.path.exists('raw/telluric_model.dat'):
-        iraf.cp('raw/telluric_model.dat', 'work/')
-
     std_files = glob('raw/*.std.dat')
     if len(std_files) != 0:
         for f in std_files:
@@ -36,10 +33,6 @@ def sort():
 
     if os.path.exists('raw/bias.fits'):
         iraf.cp('raw/bias.fits', 'work/')
-
-    bpm_file_list = glob('raw/bpm_g?.fits')
-    if len(bpm_file_list) != 0:
-        iraf.cp(bpm_file_list[0], 'work/')
 
     fs = glob('raw/*.qe.fits')
     if len(fs) > 0:
@@ -58,7 +51,7 @@ def sort():
 
     # make a list of the raw files
     fs = glob('raw/*.fits')
-    for f in sensfs + bpm_file_list:
+    for f in sensfs:
         fs.remove(f)
     # Add a ../ in front of all of the file names
     for i in range(len(fs)):

@@ -4,6 +4,7 @@ from astropy.io import fits, ascii
 import os
 from glob import glob
 from pyraf import iraf
+import pkg_resources
 
 
 def getobstypes(fs):
@@ -151,7 +152,8 @@ def read_standard_file(filename, maskname):
 
 def read_telluric_model(maskname):
     # Read in the telluric model
-    telluric = ascii.read('telluric_model.dat')
+    telluric_model_filename = pkg_resources.resource_filename('lcogtgemini', 'telluric_model.dat')
+    telluric = ascii.read(telluric_model_filename)
     telluric['col2'] = smooth(maskname, telluric['col2'])
     return telluric
 

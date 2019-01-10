@@ -2,14 +2,15 @@ import lcogtgemini
 from pyraf import iraf
 from astropy.io import fits
 import numpy as np
+import pkg_resources
 
 
 def get_bad_pixel_mask(binnings, yroi):
     if lcogtgemini.detector == 'Hamamatsu':
         if lcogtgemini.is_GS:
-            bpm_file = 'bpm_gs.fits'
+            bpm_file = pkg_resources.resource_filename('lcogtgemini', 'bpm_gs.fits')
         else:
-            bpm_file = 'bpm_gn.fits'
+            bpm_file = pkg_resources.resource_filename('lcogtgemini', 'bpm_gn.fits')
 
         bpm_hdu = fits.open(bpm_file, uint16=True)
 
