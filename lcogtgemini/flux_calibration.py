@@ -83,7 +83,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename):
 
     for chip in chips:
         in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
-        standard_scale = np.median(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
+        standard_scale = np.nanmedian(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
 
         standard['col2'] /= standard_scale
         if good_pixels[in_chip].sum() > 32:  # 32 = 7 + 3 + 2 * 11 = number of parameters in default model

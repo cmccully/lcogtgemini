@@ -68,7 +68,7 @@ def speccombine(fs, outfile):
         good_pixels = np.logical_and(good_pixels, ~bad_pixels)
 
         # Take the median of the ratio of each spectrum to the first to get the rescaling
-        scale = np.median(first_fluxes[good_pixels[overlap]] / hdu['SCI'].data[0][overlap][good_pixels[overlap]])
+        scale = np.nanmedian(first_fluxes[good_pixels[overlap]] / hdu['SCI'].data[0][overlap][good_pixels[overlap]])
         scales.append(scale)
         hdu['SCI'].data[0][hdu['SCI'].data[0] == 0.0] = np.nan
         hdu['SCI'].data[0][bad_pixels] = np.nan
