@@ -44,6 +44,7 @@ def speccombine(fs, outfile):
         wavelength_step = min([wavelength_step, wavelength[1] - wavelength[0]])
 
     min_w = np.max([min_w, lcogtgemini.bluecut])
+    max_w = np.min([max_w, lcogtgemini.redcut])
     first_hdu = fits.open(fs[0])
     first_wavelengths = fits_utils.fitshdr_to_wave(first_hdu['SCI'].header)
     bad_pixels = find_bad_pixels(first_hdu['SCI'].data[0])

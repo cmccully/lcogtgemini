@@ -67,7 +67,7 @@ def extract(scifiles):
         # Trim off below the blue side cut
         hdu = fits.open('et' + f[:-4] + '.fits', mode='update')
         lam = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
-        w = lam > lcogtgemini.bluecut
+        w = (lam > lcogtgemini.bluecut) & (lam < lcogtgemini.redcut)
         trimmed_data = np.zeros((1, w.sum()))
         trimmed_data[0] = hdu['SCI'].data[0, w]
         hdu['SCI'].data = trimmed_data

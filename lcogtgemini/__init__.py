@@ -16,6 +16,7 @@ iraf.apextract()
 iraf.onedspec()
 
 bluecut = 3450
+redcut = 10000
 
 iraf.gmos.logfile = "log.txt"
 iraf.gmos.mode = 'h'
