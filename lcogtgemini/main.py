@@ -104,30 +104,28 @@ def run():
     # If a standard star, make the telluric correction
     obsclass = fits.getval(extractedfiles[0], 'OBSCLASS')
     if obsclass == 'progCal' or obsclass == 'partnerCal':
-        speccombine(extractedfiles, objname+'.notel.fits')
-        updatecomheader(extractedfiles, objname + '.notel.fits')
-        mktelluric(objname + '.notel.fits', objname, base_stddir)
+        outfile_notel = objname + '.notel.fits'
+        speccombine(extractedfiles, outfile_notel)
+        updatecomheader(extractedfiles, outfile_notel)
+        mktelluric(outfile_notel, objname, base_stddir)
 
     if telluric_correction_exists():
         # Telluric Correct
-        files_to_combine = telluric_correct(extractedfiles)
-    else:
-        files_to_combine = extractedfiles
+        extractedfiles = telluric_correct(extractedfiles)
+
+    outfile = objname + '.fits'
 
     # Combine the spectra
-    speccombine(files_to_combine, objname + '.fits')
+    speccombine(extractedfiles, outfile)
 
     # Update the combined file with the necessary header keywords
-    updatecomheader(extractedfiles, objname + '.fits')
+    updatecomheader(extractedfiles, outfile)
 
     # Clean the data of nans and infs
-    clean_nans(objname + '.fits')
+    clean_nans(outfile)
 
     # Write out the ascii file
-    spectoascii(objname + '.fits', objname + '.dat')
-
-    # Multiply by 1e-15 so the units are correct in SNEx:
-    rescale1e15(objname + '.fits')
+    spectoascii(outfile, outfile.replace('.fits', '.dat'))
 
     # Change out of the reduction directory
     iraf.cd('..')
