@@ -49,7 +49,7 @@ def speccombine(fs, outfile):
     max_w = np.min([max_w, lcogtgemini.redcut])
     first_hdu = fits.open(fs[0])
     first_wavelengths = fits_utils.fitshdr_to_wave(first_hdu['SCI'].header)
-    first_fluxes = first_hdu['SCI'].data[0]
+    first_fluxes = first_hdu['SCI'].data[0, 0]
     bad_pixels = find_bad_pixels(first_fluxes)
     first_fluxes[bad_pixels] = 0.0
 
@@ -58,7 +58,7 @@ def speccombine(fs, outfile):
     for i, f in enumerate(fs):
         hdu = fits.open(f)
         wavelengths = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
-        fluxes = hdu['SCI'].data[0]
+        fluxes = hdu['SCI'].data[0, 0]
         in_chips = np.zeros(wavelengths.shape, dtype=bool)
         basename = file_utils.get_base_name(f)
         wavelengths_hdu = fits.open(basename + '.wavelengths.fits')

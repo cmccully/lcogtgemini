@@ -33,7 +33,7 @@ def flux_calibrate(scifiles):
 
         if os.path.exists('cxet' + f[:-4] + '.fits'):
             iraf.unlearn(iraf.splot)
-            iraf.splot('cxet' + f.replace('.txt', '.fits') + '[sci]')  # just to check
+            iraf.splot('cxet' + f.replace('.txt', '.fits') + '[SCI][*,*,1]')  # just to check
 
 
 def makesensfunc(scifiles, objname, base_stddir):
