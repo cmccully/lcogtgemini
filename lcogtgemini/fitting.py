@@ -61,7 +61,7 @@ def irls(x, data, errors, model_function, initial_parameter_guess, good_pixels,
         fit_errors[weights == 0] = np.inf
         # refit
         best_parameters = optimize.curve_fit(model_function, normalized_x[good_pixels], y,
-                                             p0=best_parameters, sigma=fit_errors)[0]
+                                             p0=best_parameters, sigma=fit_errors, maxfev=10000)[0]
 
         # converged when the change in the chi^2 (or l2 norm or whatever) is
         # less than the tolerance. Hopefully this should converge quickly.
