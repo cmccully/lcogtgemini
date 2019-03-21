@@ -132,6 +132,7 @@ def updatecomheader(extractedfiles, filename):
     dateobs = fits.getval(filename, 'DATE-OBS')
     dateobs += 'T' + fits.getval(filename, 'TIME-OBS')
     fits.setval(filename, 'DATE-OBS', value=dateobs)
+    fits.setval(filename, 'BUNIT', value='1E-15 erg / (s cm2 angstrom)')
 
 
 def spectoascii(infilename, outfilename):
