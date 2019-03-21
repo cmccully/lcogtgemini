@@ -38,14 +38,14 @@ def flux_calibrate(scifiles):
 
 def makesensfunc(scifiles, objname):
     for f in scifiles:
-        # Find the standard star file
-        standard_file = get_standard_file(objname)
-        redorblue = getredorblue(f)
-        setupname = file_utils.getsetupname(f)
         # If this is a standard star, run standard
         # Standards will have an observation class of either progCal or partnerCal
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
+            # Find the standard star file
+            standard_file = get_standard_file(objname)
+            redorblue = getredorblue(f)
+            setupname = file_utils.getsetupname(f)
             wavelengths_filename = setupname + '.wavelengths.fits'
             specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits', standard_file, wavelengths_filename)
 
