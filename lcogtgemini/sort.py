@@ -9,9 +9,16 @@ from astropy.io import fits
 def sort():
     if not os.path.exists('raw'):
         iraf.mkdir('raw')
-    fs = glob('*.fits')
-    fs += glob('*.dat')
-    for f in fs:
+
+    for f in glob('*.fits'):
+        hdr = fits.getheader(f, ext=1)
+        if hdr.get('NAXIS2') == 2112:
+            lcogtgemini.fits_utils.cut_gs_image(f, os.path.join('raw', f), [812, 1324], 12)
+            os.remove(f)
+        else:
+            iraf.mv(f, 'raw/')
+
+    for f in glob('*.dat'):
         iraf.mv(f, 'raw/')
 
     # Make a reduction directory
