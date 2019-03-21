@@ -42,7 +42,7 @@ def run():
     iraf.cd('work')
 
     # Initialize variables that depend on which site was used
-    extfile, base_stddir = init_northsouth(fs)
+    extfile = init_northsouth(fs)
 
     # Get the observation type
     obstypes, obsclasses = getobstypes(fs)
@@ -94,7 +94,7 @@ def run():
     correct_for_extinction(scifiles, extfile)
 
     # If standard star, make the sensitivity function
-    makesensfunc(scifiles, objname, base_stddir)
+    makesensfunc(scifiles, objname)
 
     # Flux calibrate the spectrum
     flux_calibrate(scifiles)
@@ -107,7 +107,7 @@ def run():
         outfile_notel = objname + '.notel.fits'
         speccombine(extractedfiles, outfile_notel)
         updatecomheader(extractedfiles, outfile_notel)
-        mktelluric(outfile_notel, objname, base_stddir)
+        mktelluric(outfile_notel, objname)
 
     if telluric_correction_exists():
         # Telluric Correct

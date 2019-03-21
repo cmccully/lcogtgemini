@@ -58,7 +58,7 @@ def telluric_correct(input_files):
     return output_files
 
 
-def mktelluric(filename, objname, base_stddir):
+def mktelluric(filename, objname):
     observed_hdu = fits.open(filename)
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
     observed_data = observed_hdu[0].data
@@ -66,7 +66,7 @@ def mktelluric(filename, objname, base_stddir):
     maskname = observed_hdu[0].header['MASKNAME']
     telluric_model = read_telluric_model(maskname)
     # Read in the standard file
-    standard_filename = lcogtgemini.file_utils.get_standard_file(objname, base_stddir)
+    standard_filename = lcogtgemini.file_utils.get_standard_file(objname)
     standard = lcogtgemini.file_utils.read_standard_file(standard_filename, maskname)
 
     good_pixels = observed_data > 0

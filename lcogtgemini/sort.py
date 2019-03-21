@@ -87,9 +87,7 @@ def init_northsouth(fs):
         lcogtgemini.detector = 'E2V DD'
 
     if lcogtgemini.is_GS:
-        base_stddir = 'ctionewcal/'
         extfile = iraf.osfn('gmisc$lib/onedstds/ctioextinct.dat')
     else:
-        base_stddir = 'spec50cal/'
         extfile = iraf.osfn('gmisc$lib/onedstds/kpnoextinct.dat')
-    return extfile, base_stddir
+    return extfile

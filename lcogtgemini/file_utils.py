@@ -136,12 +136,18 @@ def get_images_from_txt_file(filename):
     return lines
 
 
-def get_standard_file(objname, base_stddir):
-    if os.path.exists(objname+'.std.dat'):
-        standard_file = objname+'.std.dat'
+def get_standard_file(objname):
+    places_to_look = [objname + '.std.dat',
+                      os.path.join(iraf.osfn('onedstds$spec50cal/'), objname + '.dat'),
+                      os.path.join(iraf.osfn('onedstds$ctionewcal/'), objname + '.dat'),
+                      os.path.join(iraf.osfn('onedstds$oke90/'), objname + '.dat'),
+                      os.path.join(iraf.osfn('onedstds$iidscal/'), objname + '.dat'),
+                      os.path.join(iraf.osfn('gmos$calib/'), objname + '.dat')]
+    for standard_file in places_to_look:
+        if os.path.exists(standard_file):
+            return standard_file
     else:
-        standard_file = os.path.join(iraf.osfn('gmisc$lib/onedstds/'), base_stddir, objname + '.dat')
-    return standard_file
+        raise IOError('could not find standard file for ' + objname)
 
 
 def read_standard_file(filename, maskname):

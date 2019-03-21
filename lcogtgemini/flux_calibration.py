@@ -36,10 +36,10 @@ def flux_calibrate(scifiles):
             iraf.splot('cxet' + f.replace('.txt', '.fits') + '[SCI][*,*,1]')  # just to check
 
 
-def makesensfunc(scifiles, objname, base_stddir):
+def makesensfunc(scifiles, objname):
     for f in scifiles:
         # Find the standard star file
-        standard_file = get_standard_file(objname, base_stddir)
+        standard_file = get_standard_file(objname)
         redorblue = getredorblue(f)
         setupname = file_utils.getsetupname(f)
         # If this is a standard star, run standard
