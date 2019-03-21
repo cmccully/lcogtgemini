@@ -57,7 +57,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename):
 
     # Read in the observed data
     observed_hdu = fits.open(specfile)
-    observed_data = observed_hdu[2].data[0]
+    observed_data = observed_hdu[2].data[0, 0]
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[2].header)
 
     telluric_model = lcogtgemini.file_utils.read_telluric_model(observed_hdu[0].header['MASKNAME'])
@@ -79,7 +79,7 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename):
 
     wavelengths_hdu = fits.open(wavelengths_filename)
     chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
-    need_to_interplolate = np.ones(observed_hdu[2].data[0].shape, dtype=bool)
+    need_to_interplolate = np.ones(observed_hdu[2].data[0, 0].shape, dtype=bool)
 
     for chip in chips:
         in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
@@ -100,11 +100,11 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename):
         else:
             sensitivity = np.ones(in_chip.sum())
 
-        observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
+        observed_hdu[2].data[0, 0][in_chip] = utils.fluxtomag(sensitivity)
         need_to_interplolate[in_chip] = False
         standard['col2'] *= standard_scale
 
-    observed_hdu[2].data = observed_hdu[2].data[0]
+    observed_hdu[2].data = observed_hdu[2].data[0, 0]
     observed_hdu[2].data[need_to_interplolate] = np.interp(observed_wavelengths[need_to_interplolate],
                                                            observed_wavelengths[~need_to_interplolate],
                                                            observed_hdu[2].data[~need_to_interplolate])

@@ -35,11 +35,11 @@ def telluric_correct(input_files):
         # to find wavelength shift of standard star.
         w = np.logical_and(waves > 7500., waves < 7800.)
         tw = np.logical_and(telwave > 7500., telwave < 7800.)
-        good_pixels = hdu['SCI'].data[0][w] != 0
+        good_pixels = hdu['SCI'].data[0, 0][w] != 0
         if good_pixels.sum() == 0:
             p = [1.0, 0.0]
         else:
-            cleaned_data = np.interp(waves[w], waves[w][good_pixels], hdu['SCI'].data[0][w][good_pixels])
+            cleaned_data = np.interp(waves[w], waves[w][good_pixels], hdu['SCI'].data[0, 0][w][good_pixels])
             p = fitting.fitxcor(waves[w], cleaned_data, telwave[tw], telspec[tw])
         # shift and stretch standard star spectrum to match science
         # spectrum.
@@ -50,7 +50,7 @@ def telluric_correct(input_files):
         telcorr = telcorr ** (airmass ** 0.55)
 
         # Divide science spectrum by transformed standard star sub-spectrum
-        hdu['SCI'].data[0] /= telcorr
+        hdu['SCI'].data[0, 0] /= telcorr
         outfile = 't'+filename
         output_files.append(outfile)
         # Copy telluric-corrected data to new file.
