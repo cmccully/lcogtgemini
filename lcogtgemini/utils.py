@@ -46,7 +46,7 @@ def boxcar_smooth(spec_wave, spec_flux, smoothwidth):
 def get_binning(txt_filename, rawpath):
     with open(txt_filename) as f:
         lines = f.readlines()
-    return fits.getval(rawpath + lines[0].rstrip(), 'CCDSUM', 1).replace(' ', 'x')
+    return fits.getval(os.path.join(rawpath, lines[0].rstrip()), 'CCDSUM', 1).replace(' ', 'x')
 
 
 def convert_pixel_list_to_array(filename, nx, ny):
@@ -59,7 +59,6 @@ def rescale1e15(filename):
     hdu[0].data *= 1e15
     hdu.flush()
     hdu.close()
-
 
 
 def butter_bandpass(lowcut, highcut, fs, order=5):
@@ -75,7 +74,8 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     y = lfilter(b, a, data)
     return y
 
-def get_wavelengths_of_chips(wavelengths_hdu):
+
+def get_wavelengths_of_chips(wavelengths_hdu, pad=0):
     midline = wavelengths_hdu[1].data.shape[0] // 2
     amps_per_chip = lcogtgemini.namps // lcogtgemini.nchips
     chips = []
@@ -85,10 +85,10 @@ def get_wavelengths_of_chips(wavelengths_hdu):
         chip_wavelengths = []
         # For each amplifier on the chip
         for amplifier in range(c * amps_per_chip + 1, (c + 1) * amps_per_chip + 1):
-            # Get the wavelength 10 pixels into datasec and 10 pixels from the edge of datasec
+            # Get the wavelength n pixels into datasec and n pixels from the edge of datasec
             start_data_range, end_data_range = [int(x) for x in wavelengths_hdu[amplifier].header['DATASEC'][1:-1].split(',')[0].split(':')]
-            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, 9 + start_data_range])
-            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, end_data_range - 9])
+            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, pad + start_data_range - 1])
+            chip_wavelengths.append(wavelengths_hdu[amplifier].data[midline, end_data_range - pad - 1])
         # Take the min and max wavelengths of
         chips.append((min(chip_wavelengths), max(chip_wavelengths)))
     return chips

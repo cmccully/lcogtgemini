@@ -18,6 +18,7 @@ from lcogtgemini.file_utils import read_telluric_model
 
 telluricWaves = [(5500., 6050.), (6250., 6360.), (6438., 6530.), (6821., 7434.), (7550., 8613.), (8798., 10338.)]
 
+
 def telluric_correct(input_files):
     output_files = []
     for filename in input_files:
@@ -34,12 +35,12 @@ def telluric_correct(input_files):
         # to find wavelength shift of standard star.
         w = np.logical_and(waves > 7500., waves < 7800.)
         tw = np.logical_and(telwave > 7500., telwave < 7800.)
-        good_pixels = hdu['SCI'].data[0][w] != 0
+        good_pixels = hdu['SCI'].data[0, 0][w] != 0
         if good_pixels.sum() == 0:
             p = [1.0, 0.0]
         else:
-            cleaned_data = np.interp(waves[w], waves[w][good_pixels], hdu['SCI'].data[0][w][good_pixels])
-            p = fitting.fitxcor(waves[w],cleaned_data, telwave[tw], telspec[tw])
+            cleaned_data = np.interp(waves[w], waves[w][good_pixels], hdu['SCI'].data[0, 0][w][good_pixels])
+            p = fitting.fitxcor(waves[w], cleaned_data, telwave[tw], telspec[tw])
         # shift and stretch standard star spectrum to match science
         # spectrum.
         telcorr = np.interp(waves, p[0] * telwave + p[1], telspec, left=1.0, right=1.0)
@@ -49,7 +50,7 @@ def telluric_correct(input_files):
         telcorr = telcorr ** (airmass ** 0.55)
 
         # Divide science spectrum by transformed standard star sub-spectrum
-        hdu['SCI'].data[0] /= telcorr
+        hdu['SCI'].data[0, 0] /= telcorr
         outfile = 't'+filename
         output_files.append(outfile)
         # Copy telluric-corrected data to new file.
@@ -57,7 +58,7 @@ def telluric_correct(input_files):
     return output_files
 
 
-def mktelluric(filename, objname, base_stddir):
+def mktelluric(filename, objname):
     observed_hdu = fits.open(filename)
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[0].header)
     observed_data = observed_hdu[0].data
@@ -65,7 +66,7 @@ def mktelluric(filename, objname, base_stddir):
     maskname = observed_hdu[0].header['MASKNAME']
     telluric_model = read_telluric_model(maskname)
     # Read in the standard file
-    standard_filename = lcogtgemini.file_utils.get_standard_file(objname, base_stddir)
+    standard_filename = lcogtgemini.file_utils.get_standard_file(objname)
     standard = lcogtgemini.file_utils.read_standard_file(standard_filename, maskname)
 
     good_pixels = observed_data > 0
@@ -90,9 +91,9 @@ def mktelluric(filename, objname, base_stddir):
                             good_pixels)
 
     standard['col2'] *= standard_scale
-    normalized_standard_wavelengths =  (standard['col1'] - best_fit['xmin']) / best_fit['x_range']
+    normalized_standard_wavelengths = (standard['col1'] - best_fit['xmin']) / best_fit['x_range']
     recaled_standard_wavelengths = best_fit['popt'][5] * (normalized_standard_wavelengths - best_fit['popt'][4])
-    standard_wavelengths = recaled_standard_wavelengths *  best_fit['x_range'] +  best_fit['xmin']
+    standard_wavelengths = recaled_standard_wavelengths * best_fit['x_range'] + best_fit['xmin']
     standard_flux = np.interp(observed_wavelengths, standard_wavelengths, best_fit['popt'][6] * standard['col2'])
 
     # In the telluric regions
@@ -124,12 +125,13 @@ def make_standard_model(telluric_waves, telluric_correction, std_waves, std_flux
                         wavelength_min, wavelength_range):
     normalized_telluric_wavelengths = (telluric_waves - wavelength_min) / wavelength_range
     normalized_standard_wavelengths = (std_waves - wavelength_min) / wavelength_range
+
     def standard_mode(x, *p):
         # p 0, 1, 2 are for telluric fitting.
         # 0 and 1 linear wavelength shift and scale for telluric
         # 2 is power of telluric correction for the O2 A and B bands
         # 3 is the power of the telluric correction for the water bands (the rest of the telluric features)
-        shifted_telluric_wavelengths =  p[1] * (normalized_telluric_wavelengths - p[0])
+        shifted_telluric_wavelengths = p[1] * (normalized_telluric_wavelengths - p[0])
         telluric_model = np.interp(x, shifted_telluric_wavelengths, telluric_correction,
                                    left=1.0, right=1.0)
 
@@ -142,7 +144,9 @@ def make_standard_model(telluric_waves, telluric_correction, std_waves, std_flux
         # p 3, 4 are linear wavelength shift and scale for the standard model
         std_model = np.interp(x, p[5] * (normalized_standard_wavelengths - p[4]), std_flux)
         return p[6] * telluric_model * std_model
+
     return standard_mode
+
 
 def fit_standard(wavelengths, data, telluric_waves, telluric_correction, std_waves, std_flux, good_pixels,
                  weight_scale=20.0):
@@ -150,6 +154,7 @@ def fit_standard(wavelengths, data, telluric_waves, telluric_correction, std_wav
     _, wavelength_min, wavelength_range = fitting.normalize_fitting_coordinate(wavelengths)
     function_to_fit = make_standard_model(telluric_waves, telluric_correction, std_waves, std_flux,
                                           wavelength_min, wavelength_range)
+
     def init_p0():
         p0 = np.zeros(7)
         p0[0] = 0.0
@@ -160,6 +165,7 @@ def fit_standard(wavelengths, data, telluric_waves, telluric_correction, std_wav
         p0[5] = 1.0
         p0[6] = 1.0
         return p0
+
     p0 = init_p0()
     errors = np.sqrt(np.abs(data) * 0.01)
     best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)

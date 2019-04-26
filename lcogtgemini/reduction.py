@@ -32,7 +32,7 @@ def scireduce(scifiles, rawpath):
             iraf.unlearn(iraf.gqecorr)
             iraf.gqecorr(f[:-4]+'.mef', outimages=f[:-4]+'.qe.fits', fl_keep=True, fl_correct=True,
                          fl_vardq=lcogtgemini.dodq, refimages=setupname + '.arc.arc.fits',
-                         corrimages=setupname +'.qe.fits', verbose=True)
+                         corrimages=setupname + '.qe.fits', verbose=True)
             unmosaiced_name = f[:-4]+'.qe.fits'
         else:
             unmosaiced_name = f[:-4]+'.mef.fits'
@@ -45,7 +45,6 @@ def scireduce(scifiles, rawpath):
         hdu.flush()
         hdu.close()
 
-
         iraf.unlearn(iraf.gmosaic)
         iraf.gmosaic(unmosaiced_name, outimages=f[:-4] + '.fits', fl_vardq=lcogtgemini.dodq,
                      fl_clean=False)
@@ -56,25 +55,20 @@ def scireduce(scifiles, rawpath):
 
 def extract(scifiles):
     for f in scifiles:
-        iraf.unlearn(iraf.gsextract)
-        # Extract the specctrum
-        iraf.gsextract('t' + f[:-4], fl_inter='yes', bfunction='legendre',
-                       fl_vardq=lcogtgemini.dodq,
-                       border=2, bnaverage=-3, bniterate=2, blow_reject=2.0,
-                       bhigh_reject=2.0, long_bsample='-100:-40,40:100',
-                       background='fit', weights='variance',
-                       lsigma=3.0, usigma=3.0, tnsum=100, tstep=100, mode='h')
-
         # Trim off below the blue side cut
-        hdu = fits.open('et' + f[:-4] +'.fits', mode='update')
+        tfile = 't' + f[:-4] + '.fits'
+        hdu = fits.open(tfile)
         lam = fits_utils.fitshdr_to_wave(hdu['SCI'].header)
-        w = lam > lcogtgemini.bluecut
-        trimmed_data =np.zeros((1, w.sum()))
-        trimmed_data[0] = hdu['SCI'].data[0, w]
-        hdu['SCI'].data = trimmed_data
-        hdu['SCI'].header['NAXIS1'] = w.sum()
-        hdu['SCI'].header['CRPIX1'] = 1
-        hdu['SCI'].header['CRVAL1'] = lam[w][0]
-        hdu.flush()
+        xmin = np.min(np.where(lam > lcogtgemini.bluecut)) + 1
+        xmax = np.max(np.where(lam < lcogtgemini.redcut)) + 1
 
-        hdu.close()
+        # Extract the spectrum
+        iraf.unlearn(iraf.apall)
+        scispec = iraf.mktemp("tmpscispec")
+        iraf.apall(tfile + '[SCI][{}:{},*]'.format(xmin, xmax), output=scispec, nfind=1, nsum=100,
+                   b_function='legendre', b_order=2, b_sample='-100:-40,40:100', b_niterate=2, b_low_reject=2., b_high_reject=2.,
+                   t_nsum=100, t_step=100, t_function='chebyshev', t_order=5, t_niterate=3,
+                   background='fit', weights='variance', lsigma=3., usigma=3.)
+
+        # Reassemble the multiextension fits file
+        iraf.wmef(tfile + '[MDF],' + scispec, 'e' + tfile, extnames='MDF,SCI', phu=tfile)

@@ -21,6 +21,7 @@ def xcorfun(p, warr, farr, telwarr, telfarr):
     asfarr = np.interp(warr, p[0] * telwarr + p[1], telfarr, left=1.0, right=1.0)
     return np.abs(1.0 / ncor(farr, asfarr))
 
+
 def normalize_fitting_coordinate(x):
     x_range = x.max() - x.min()
     return (x - x.min()) / x_range, x.min(), x_range
@@ -31,10 +32,10 @@ def irls(x, data, errors, model_function, initial_parameter_guess, good_pixels,
          tol=1e-6, weight_function=robust.norms.AndrewWave, weight_scale=2.0, maxiter=10):
     weights_calculator = weight_function(weight_scale)
 
-    #Normalize to make fitting easier
+    # Normalize to make fitting easier
     normalized_x, xmin, x_range = normalize_fitting_coordinate(x)
 
-    y_scale =  np.median(data[good_pixels])
+    y_scale = np.median(data[good_pixels])
     y = data[good_pixels] / y_scale
     scatter = errors[good_pixels] / y_scale
 
@@ -42,7 +43,7 @@ def irls(x, data, errors, model_function, initial_parameter_guess, good_pixels,
     # Use 1 / sigma^2 as weights
     best_parameters = optimize.curve_fit(model_function, normalized_x[good_pixels], y, p0=initial_parameter_guess, sigma=scatter)[0]
 
-    notconverged=True
+    notconverged = True
     last_chi2 = np.inf
     iter = 0
     # Until converged
@@ -53,14 +54,14 @@ def irls(x, data, errors, model_function, initial_parameter_guess, good_pixels,
         chi2 = ((residuals / scatter) ** 2.0).sum()
 
         # update the scaling (the MAD of the residuals)
-        scatter = mad(residuals)  * 1.4826 # To convert to standard deviation
+        scatter = mad(residuals) * 1.4826  # To convert to standard deviation
         weights = weights_calculator.weights(residuals / scatter).flatten()
         fit_errors = np.zeros(weights.shape)
         fit_errors[weights > 0] = weights[weights > 0] ** -2.0
         fit_errors[weights == 0] = np.inf
         # refit
         best_parameters = optimize.curve_fit(model_function, normalized_x[good_pixels], y,
-                                             p0=best_parameters, sigma=fit_errors)[0]
+                                             p0=best_parameters, sigma=fit_errors, maxfev=10000)[0]
 
         # converged when the change in the chi^2 (or l2 norm or whatever) is
         # less than the tolerance. Hopefully this should converge quickly.
@@ -102,6 +103,7 @@ def run_polynomal_fourier_fit(x, y, errors, n_poly, n_fourier, weight_scale, goo
 
     return best_fit
 
+
 def run_fit(x, y, errors, function_to_fit, p0, weight_scale, good_pixels):
     # Run IRLS on the data given the input parameters
     best_fit = irls(x, y, errors, function_to_fit, p0, good_pixels, weight_scale=weight_scale)
@@ -110,6 +112,7 @@ def run_fit(x, y, errors, function_to_fit, p0, weight_scale, good_pixels):
     plot_best_fit(x, y, best_fit, good_pixels),
 
     return best_fit
+
 
 def fit_polynomial_fourier_model(x, y, errors, n_poly, n_fourier, good_pixels, weight_scale=2.0):
 
@@ -170,6 +173,6 @@ def fitxcor(warr, farr, telwarr, telfarr):
     correction
     """
     res = optimize.minimize(xcorfun, [1.0, 0.0], method='Nelder-Mead',
-                   args=(warr, farr, telwarr, telfarr))
+                            args=(warr, farr, telwarr, telfarr))
 
     return res['x']

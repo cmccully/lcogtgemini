@@ -1,7 +1,8 @@
 import lcogtgemini
 from pyraf import iraf
 
-def skysub(scifiles, rawpath):
+
+def skysub(scifiles):
     for f in scifiles:
         # sky subtraction
         # output has an s prefixed on the front

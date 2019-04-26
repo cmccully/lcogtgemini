@@ -49,7 +49,7 @@ def fitshdr_to_wave(hdr):
     else:
         cdelt = float(hdr['CD1_1'])
     npix = float(hdr['NAXIS1'])
-    lam = np.arange(crval - cdelt * crpix ,
+    lam = np.arange(crval - cdelt * crpix,
                     crval + cdelt * (npix - crpix) - 1e-4,
                     cdelt)
     return lam
@@ -77,6 +77,7 @@ def cut_gs_image(filename, output_filename, pixel_range, namps):
     :param output_filename:
     :param pixel_range: array-like, The range of pixels to keep, python indexed,
                         given in binned pixels
+    :param namps: int, Number of amplifiers (same as lcogtgemini.namps)
     :return:
     """
     hdu = fits.open(filename, unit16=True)
@@ -84,15 +85,14 @@ def cut_gs_image(filename, output_filename, pixel_range, namps):
         ccdsum = hdu[i].header['CCDSUM']
         ccdsum = np.array(ccdsum.split(), dtype=np.int)
 
-        y_ccdsec = [(pixel_range[0]  * ccdsum[1]) + 1,
-                    (pixel_range[1]) * ccdsum[1]]
+        y_ccdsec = [(pixel_range[0] * ccdsum[1]) + 1,
+                    pixel_range[1] * ccdsum[1]]
 
         x_detector_section = get_x_pixel_range(hdu[i].header['DETSEC'])
         hdu[i].header['DETSEC'] = hdr_pixel_range(int(x_detector_section[0]), int(x_detector_section[1]), y_ccdsec[0], y_ccdsec[1])
 
         x_ccd_section = get_x_pixel_range(hdu[i].header['CCDSEC'])
         hdu[i].header['CCDSEC'] = hdr_pixel_range(int(x_ccd_section[0]), int(x_ccd_section[1]), y_ccdsec[0], y_ccdsec[1])
-
 
         numpix = pixel_range[1] - pixel_range[0]
 
@@ -115,13 +115,14 @@ def updatecomheader(extractedfiles, filename):
         exptimes.append(float(fits.getval(f, 'EXPTIME')))
 
     fits.setval(filename, 'AIRMASS', value=np.mean(airmasses))
+    fits.setval(filename, 'EXPTIME', value=np.sum(exptimes))
     fits.setval(filename, 'SLIT', value=fits.getval(extractedfiles[0], 'MASKNAME').replace('arcsec', ''))
 
     comhdu = fits.open(filename, mode='update')
 
     extractedhdu = fits.open(extractedfiles[0])
     for k in extractedhdu[0].header.keys():
-        if not k in comhdu[0].header.keys():
+        if k not in comhdu[0].header.keys():
             extractedhdu[0].header.cards[k].verify('fix')
             comhdu[0].header.append(extractedhdu[0].header.cards[k])
 
@@ -131,6 +132,7 @@ def updatecomheader(extractedfiles, filename):
     dateobs = fits.getval(filename, 'DATE-OBS')
     dateobs += 'T' + fits.getval(filename, 'TIME-OBS')
     fits.setval(filename, 'DATE-OBS', value=dateobs)
+    fits.setval(filename, 'BUNIT', value='1E-15 erg / (s cm2 angstrom)')
 
 
 def spectoascii(infilename, outfilename):

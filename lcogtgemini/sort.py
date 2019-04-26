@@ -5,12 +5,20 @@ import os
 from glob import glob
 from astropy.io import fits
 
+
 def sort():
     if not os.path.exists('raw'):
         iraf.mkdir('raw')
-    fs = glob('*.fits')
-    fs += glob('*.dat')
-    for f in fs:
+
+    for f in glob('*.fits'):
+        hdr = fits.getheader(f, ext=1)
+        if hdr.get('NAXIS2') == 2112:
+            lcogtgemini.fits_utils.cut_gs_image(f, os.path.join('raw', f), [812, 1324], 12)
+            os.remove(f)
+        else:
+            iraf.mv(f, 'raw/')
+
+    for f in glob('*.dat'):
         iraf.mv(f, 'raw/')
 
     # Make a reduction directory
@@ -25,9 +33,6 @@ def sort():
     if os.path.exists('raw/telcor.dat'):
         iraf.cp('raw/telcor.dat', 'work/')
 
-    if os.path.exists('raw/telluric_model.dat'):
-        iraf.cp('raw/telluric_model.dat', 'work/')
-
     std_files = glob('raw/*.std.dat')
     if len(std_files) != 0:
         for f in std_files:
@@ -35,10 +40,6 @@ def sort():
 
     if os.path.exists('raw/bias.fits'):
         iraf.cp('raw/bias.fits', 'work/')
-
-    bpm_file_list = glob('raw/bpm_g?.fits')
-    if len(bpm_file_list) != 0:
-        iraf.cp(bpm_file_list[0], 'work/')
 
     fs = glob('raw/*.qe.fits')
     if len(fs) > 0:
@@ -57,13 +58,15 @@ def sort():
 
     # make a list of the raw files
     fs = glob('raw/*.fits')
+    for f in sensfs:
+        fs.remove(f)
     # Add a ../ in front of all of the file names
     for i in range(len(fs)):
         fs[i] = '../' + fs[i]
     return np.array(fs)
 
 
-def init_northsouth(fs, topdir, rawpath):
+def init_northsouth(fs):
     lcogtgemini.is_GS = fits.getval(fs[0], 'OBSERVAT') == 'Gemini-South'
 
     if 'Hamamatsu' in fits.getval(fs[0], 'DETECTOR'):
@@ -79,7 +82,7 @@ def init_northsouth(fs, topdir, rawpath):
         else:
             lcogtgemini.xchip_shifts = [-0.95, 0.0, 0.48]
             lcogtgemini.ychip_shifts = [-0.21739, 0.0, 0.1727]
-            lcogtgemini.chip_rotations = [-0.004, 0.0, -0.00537 ]
+            lcogtgemini.chip_rotations = [-0.004, 0.0, -0.00537]
             lcogtgemini.chip_gap_size = 67.0
     elif not lcogtgemini.is_GS:
         lcogtgemini.namps = 6
@@ -91,11 +94,7 @@ def init_northsouth(fs, topdir, rawpath):
         lcogtgemini.detector = 'E2V DD'
 
     if lcogtgemini.is_GS:
-        base_stddir = 'ctionewcal/'
-        observatory = 'Gemini-South'
         extfile = iraf.osfn('gmisc$lib/onedstds/ctioextinct.dat')
     else:
-        base_stddir = 'spec50cal/'
         extfile = iraf.osfn('gmisc$lib/onedstds/kpnoextinct.dat')
-        observatory = 'Gemini-North'
-    return extfile, observatory, base_stddir, rawpath
+    return extfile

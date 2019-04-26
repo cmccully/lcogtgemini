@@ -57,7 +57,7 @@ def makemasterflat(flatfiles, rawpath, plot=True):
             continue
         reduce_flat(flatfile, rawpath)
         setupname = getsetupname(flatfile, calfile=True)
-        flat_hdu = fits.open('t'+ flatfile[:-4] + '.mos.fits')
+        flat_hdu = fits.open('t' + flatfile[:-4] + '.mos.fits')
         wavelengths_hdu = fits.open(setupname+'.wavelengths.fits')
 
         # Open the unmoasiced (and optionally qe corrected flat file)

@@ -42,7 +42,7 @@ def run():
     iraf.cd('work')
 
     # Initialize variables that depend on which site was used
-    extfile, observatory, base_stddir, rawpath = init_northsouth(fs, topdir, rawpath)
+    extfile = init_northsouth(fs)
 
     # Get the observation type
     obstypes, obsclasses = getobstypes(fs)
@@ -54,9 +54,9 @@ def run():
     maketxtfiles(fs, obstypes, obsclasses, objname)
 
     # remember not to put ".fits" on the end of filenames!
-    flatfiles, arcfiles, scifiles = gettxtfiles(fs, objname)
+    flatfiles, arcfiles, scifiles = gettxtfiles(objname)
 
-    binnings = set([get_binning(scifile, rawpath) for scifile in scifiles])
+    binnings = {get_binning(scifile, rawpath) for scifile in scifiles}
     yroi = get_y_roi(scifiles[0], rawpath)
 
     get_bad_pixel_mask(binnings, yroi)
@@ -82,7 +82,7 @@ def run():
     scireduce(scifiles, rawpath)
 
     # Run sky subtraction
-    skysub(scifiles, rawpath)
+    skysub(scifiles)
 
     # Run LA Cosmic
     crreject(scifiles)
@@ -94,7 +94,7 @@ def run():
     correct_for_extinction(scifiles, extfile)
 
     # If standard star, make the sensitivity function
-    makesensfunc(scifiles, objname, base_stddir)
+    makesensfunc(scifiles, objname)
 
     # Flux calibrate the spectrum
     flux_calibrate(scifiles)
@@ -104,30 +104,28 @@ def run():
     # If a standard star, make the telluric correction
     obsclass = fits.getval(extractedfiles[0], 'OBSCLASS')
     if obsclass == 'progCal' or obsclass == 'partnerCal':
-        speccombine(extractedfiles, objname+'.notel.fits')
-        updatecomheader(extractedfiles, objname + '.notel.fits')
-        mktelluric(objname + '.notel.fits', objname, base_stddir)
+        outfile_notel = objname + '.notel.fits'
+        speccombine(extractedfiles, outfile_notel)
+        updatecomheader(extractedfiles, outfile_notel)
+        mktelluric(outfile_notel, objname)
 
     if telluric_correction_exists():
         # Telluric Correct
-        files_to_combine = telluric_correct(extractedfiles)
-    else:
-        files_to_combine = extractedfiles
+        extractedfiles = telluric_correct(extractedfiles)
+
+    outfile = objname + '.fits'
 
     # Combine the spectra
-    speccombine(files_to_combine, objname + '.fits')
+    speccombine(extractedfiles, outfile)
 
     # Update the combined file with the necessary header keywords
-    updatecomheader(extractedfiles, objname + '.fits')
+    updatecomheader(extractedfiles, outfile)
 
-    #Clean the data of nans and infs
-    clean_nans(objname + '.fits')
+    # Clean the data of nans and infs
+    clean_nans(outfile)
 
     # Write out the ascii file
-    spectoascii(objname + '.fits', objname + '.dat')
-
-    # Multiply by 1e-15 so the units are correct in SNEx:
-    rescale1e15(objname + '.fits')
+    spectoascii(outfile, outfile.replace('.fits', '.dat'))
 
     # Change out of the reduction directory
     iraf.cd('..')

@@ -22,7 +22,7 @@ def flux_calibrate(scifiles):
         sensitivity_wavelengths = fits_utils.fitshdr_to_wave(sensitivity_hdu['SCI'].header)
 
         # Interpolate the sensitivity onto the science wavelengths
-        science_hdu = fits.open('xet'+ f.replace('.txt', '.fits'))
+        science_hdu = fits.open('xet' + f.replace('.txt', '.fits'))
         science_wavelengths = fits_utils.fitshdr_to_wave(science_hdu['SCI'].header)
         sensitivity_correction = np.interp(science_wavelengths, sensitivity_wavelengths, sensitivity_hdu['SCI'].data)
 
@@ -33,33 +33,31 @@ def flux_calibrate(scifiles):
 
         if os.path.exists('cxet' + f[:-4] + '.fits'):
             iraf.unlearn(iraf.splot)
-            iraf.splot('cxet' + f.replace('.txt', '.fits') + '[sci]')  # just to check
+            iraf.splot('cxet' + f.replace('.txt', '.fits') + '[SCI][*,*,1]')  # just to check
 
 
-def makesensfunc(scifiles, objname, base_stddir):
+def makesensfunc(scifiles, objname):
     for f in scifiles:
-        # Find the standard star file
-        standard_file = get_standard_file(objname, base_stddir)
-        redorblue = getredorblue(f)
-        setupname = file_utils.getsetupname(f)
         # If this is a standard star, run standard
         # Standards will have an observation class of either progCal or partnerCal
         obsclass = fits.getval(f[:-4] + '.fits', 'OBSCLASS')
         if obsclass == 'progCal' or obsclass == 'partnerCal':
+            # Find the standard star file
+            standard_file = get_standard_file(objname)
+            redorblue = getredorblue(f)
+            setupname = file_utils.getsetupname(f)
             wavelengths_filename = setupname + '.wavelengths.fits'
-            specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits',
-                     standard_file, wavelengths_filename, float(fits.getval(f[:-4] + '.fits', 'EXPTIME')))
+            specsens('xet' + f[:-4] + '.fits', 'sens' + redorblue + '.fits', standard_file, wavelengths_filename)
 
 
-def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
-             stdzp=3.68e-20, thresh=8, clobber=True):
+def specsens(specfile, outfile, stdfile, wavelengths_filename):
 
     # Read in the reference star spectrum
     standard = ascii.read(stdfile, comment='#')
 
     # Read in the observed data
     observed_hdu = fits.open(specfile)
-    observed_data = observed_hdu[2].data[0]
+    observed_data = observed_hdu[2].data[0, 0]
     observed_wavelengths = fits_utils.fitshdr_to_wave(observed_hdu[2].header)
 
     telluric_model = lcogtgemini.file_utils.read_telluric_model(observed_hdu[0].header['MASKNAME'])
@@ -81,28 +79,32 @@ def specsens(specfile, outfile, stdfile, wavelengths_filename, exptime=None,
 
     wavelengths_hdu = fits.open(wavelengths_filename)
     chips = utils.get_wavelengths_of_chips(wavelengths_hdu)
-    need_to_interplolate = np.ones(observed_hdu[2].data[0].shape, dtype=bool)
+    need_to_interplolate = np.ones(observed_hdu[2].data[0, 0].shape, dtype=bool)
 
     for chip in chips:
         in_chip = np.logical_and(observed_wavelengths >= min(chip), observed_wavelengths <= max(chip))
-        standard_scale = np.median(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
+        standard_scale = np.nanmedian(np.interp(observed_wavelengths[in_chip], standard['col1'], standard['col2']))
 
         standard['col2'] /= standard_scale
-        best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
-                                                      telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
-                                                      3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
+        if good_pixels[in_chip].sum() > 32:  # 32 = 7 + 3 + 2 * 11 = number of parameters in default model
+            best_fit, n_poly, n_fourier = fit_sensitivity(observed_wavelengths[in_chip], observed_data[in_chip],
+                                                          telluric_model['col1'], telluric_model['col2'], standard['col1'], standard['col2'],
+                                                          3, 11, float(observed_hdu['SCI'].header['RDNOISE']), good_pixels[in_chip])
 
-        # Strip out the telluric correction
-        best_fit['popt'] = best_fit['popt'][6:]
-        best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
+            # Strip out the telluric correction
+            best_fit['popt'] = best_fit['popt'][6:]
+            best_fit['model_function'] = fitting.polynomial_fourier_model(n_poly, n_fourier)
 
-        # Save the sensitivity in magnitudes
-        sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
-        observed_hdu[2].data[0][in_chip] = utils.fluxtomag(sensitivity)
+            # Save the sensitivity in magnitudes
+            sensitivity = standard_scale / fitting.eval_fit(best_fit, observed_wavelengths[in_chip]) * float(observed_hdu[0].header['EXPTIME'])
+        else:
+            sensitivity = np.ones(in_chip.sum())
+
+        observed_hdu[2].data[0, 0][in_chip] = utils.fluxtomag(sensitivity)
         need_to_interplolate[in_chip] = False
         standard['col2'] *= standard_scale
 
-    observed_hdu[2].data = observed_hdu[2].data[0]
+    observed_hdu[2].data = observed_hdu[2].data[0, 0]
     observed_hdu[2].data[need_to_interplolate] = np.interp(observed_wavelengths[need_to_interplolate],
                                                            observed_wavelengths[~need_to_interplolate],
                                                            observed_hdu[2].data[~need_to_interplolate])
@@ -123,7 +125,7 @@ def make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correctio
         # 0 and 1 linear wavelength shift and scale for telluric
         # 2 is power of telluric correction for the O2 A and B bands
         # 3 is the power of the telluric correction for the water bands (the rest of the telluric features)
-        shifted_telluric_wavelengths =  p[1] * (normalized_telluric_wavelengths - p[0])
+        shifted_telluric_wavelengths = p[1] * (normalized_telluric_wavelengths - p[0])
         telluric_model = np.interp(x, shifted_telluric_wavelengths, telluric_correction,
                                    left=1.0, right=1.0)
 
@@ -145,6 +147,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
     _, wavelength_min, wavelength_range = fitting.normalize_fitting_coordinate(wavelengths)
     function_to_fit = make_sensitivity_model(n_poly, n_fourier, telluric_waves, telluric_correction, std_waves, std_flux,
                                              wavelength_min, wavelength_range)
+
     def init_p0(n_poly, n_fourier):
         p0 = np.zeros(7 + n_poly + 2 * n_fourier)
         p0[0] = 0.0
@@ -155,6 +158,7 @@ def fit_sensitivity(wavelengths, data, telluric_waves, telluric_correction, std_
         p0[5] = 1.0
         p0[6] = 1.0
         return p0
+
     p0 = init_p0(n_poly, n_fourier)
     errors = np.sqrt(np.abs(data) + readnoise ** 2.0)
     best_fit = fitting.run_fit(wavelengths, data, errors, function_to_fit, p0, weight_scale, good_pixels)

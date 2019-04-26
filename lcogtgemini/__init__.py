@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-'''
+"""
 Created on Nov 7, 2014
 
 @author: cmccully
-'''
+"""
 
 import os
 from pyraf import iraf
@@ -16,6 +16,7 @@ iraf.apextract()
 iraf.onedspec()
 
 bluecut = 3450
+redcut = 10000
 
 iraf.gmos.logfile = "log.txt"
 iraf.gmos.mode = 'h'
