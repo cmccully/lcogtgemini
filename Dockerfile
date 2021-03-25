@@ -20,7 +20,7 @@ RUN conda install -y pip numpy astropy ipython matplotlib scipy statsmodels \
 RUN conda install setuptools -y \
     && conda clean -y --all
 
-RUN pip install astroscrappy \
+RUN pip install git+https://github.com/astropy/astroscrappy.git \
         && rm -rf ~/.cache/pip
 
 RUN mkdir /home/gemini/bin \
