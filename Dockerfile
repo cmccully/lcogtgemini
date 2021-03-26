@@ -20,9 +20,6 @@ RUN conda install -y pip numpy astropy ipython matplotlib scipy statsmodels \
 RUN conda install setuptools -y \
     && conda clean -y --all
 
-RUN pip install git+https://github.com/astropy/astroscrappy.git \
-        && rm -rf ~/.cache/pip
-
 RUN mkdir /home/gemini/bin \
         && mkdir /home/gemini/src
 
@@ -33,6 +30,14 @@ USER root
 COPY . /home/gemini/src/lcogtgemini
 RUN chown -R gemini:domainusers /home/gemini/src/lcogtgemini
 USER gemini
+
+WORKDIR /home/gemini/src
+
+RUN git clone https://github.com/astropy/astroscrappy.git
+
+WORKDIR /home/gemini/src/astroscrappy
+
+RUN git checkout tags/1.0.8 && git checkout master -- astroscrappy/astroscrappy.pyx && python setup.py install
 
 WORKDIR /home/gemini/src/lcogtgemini
 
