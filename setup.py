@@ -6,4 +6,4 @@ setup(name='lcogtgemini',
       version=0.1,
       packages=['lcogtgemini'],
       install_requires=['numpy', 'astropy', 'scipy'],
-      entry_points={'console_scripts': ['reduce_gemini=lcogtgemini:run']})
+      entry_points={'console_scripts': ['reduce_gemini=lcogtgemini.main:run']})
